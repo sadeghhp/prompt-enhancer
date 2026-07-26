@@ -1,9 +1,10 @@
-import type { Provider, Session } from './types'
+import type { BestPracticeCollection, Provider, Session } from './types'
 
 const KEYS = {
   providers: 'pe.providers',
   sessions: 'pe.sessions',
   activeSession: 'pe.activeSession',
+  bestPractices: 'pe.bestPractices',
 } as const
 
 function load<T>(key: string, fallback: T): T {
@@ -32,4 +33,9 @@ export const storage = {
 
   loadActiveSession: (): string | null => localStorage.getItem(KEYS.activeSession),
   saveActiveSession: (id: string) => localStorage.setItem(KEYS.activeSession, id),
+
+  loadBestPractices: (): BestPracticeCollection[] =>
+    load<BestPracticeCollection[]>(KEYS.bestPractices, []),
+  saveBestPractices: (collections: BestPracticeCollection[]) =>
+    save(KEYS.bestPractices, collections),
 }

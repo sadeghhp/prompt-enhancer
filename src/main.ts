@@ -1,9 +1,16 @@
 import Alpine from 'alpinejs'
 import { enhancePrompt } from './api'
+import type { AppliedBestPractice } from './api'
 import { storage } from './storage'
 import { applyTheme, loadTheme, saveTheme } from './theme'
-import { DEFAULT_OPTIONS, uid } from './types'
-import type { ColumnSettings, PromptColumn, Provider, Session } from './types'
+import { DEFAULT_OPTIONS, TARGET_PLATFORMS, TARGET_TYPES, defaultTarget, uid } from './types'
+import type {
+  BestPracticeCollection,
+  ColumnSettings,
+  PromptColumn,
+  Provider,
+  Session,
+} from './types'
 
 /** The provider's configured default model, falling back to its first model. */
 function defaultModelFor(provider: Provider | undefined) {
@@ -18,6 +25,7 @@ function defaultSettings(providers: Provider[]): ColumnSettings {
     modelId: defaultModelFor(provider)?.id ?? '',
     outputLanguage: 'English',
     options: { ...DEFAULT_OPTIONS },
+    target: defaultTarget(),
   }
 }
 
@@ -58,11 +66,14 @@ function migrateSession(s: Session, providers: Provider[]): void {
       col.instruction ??= ''
       col.producedBy ??= ''
       col.showAdvanced ??= false
+      col.settings.target ??= defaultTarget()
+      col.settings.target.bestPracticeIds ??= []
     }
     s.viewIndex = clampView(s.viewIndex ?? 0, s.chain.length)
     return
   }
   const settings = s.settings ?? defaultSettings(providers)
+  settings.target ??= defaultTarget()
   const chain: PromptColumn[] = [
     newColumn(settings, {
       text: s.draft ?? '',
@@ -96,6 +107,9 @@ function clampView(index: number, chainLength: number): number {
 Alpine.data('mainApp', () => ({
   providers: [] as Provider[],
   sessions: [] as Session[],
+  bestPractices: [] as BestPracticeCollection[],
+  targetPlatforms: TARGET_PLATFORMS,
+  targetTypes: TARGET_TYPES,
   activeId: '' as string,
   enhancing: false,
   error: '',
@@ -109,6 +123,7 @@ Alpine.data('mainApp', () => ({
 
   init() {
     this.providers = storage.loadProviders()
+    this.bestPractices = storage.loadBestPractices()
     this.sessions = storage.loadSessions()
     for (const s of this.sessions) migrateSession(s, this.providers)
     if (this.sessions.length === 0) {
@@ -190,6 +205,41 @@ Alpine.data('mainApp', () => ({
     this.persist()
   },
 
+  isPracticeSelected(col: PromptColumn, collectionId: string): boolean {
+    return col.settings.target.bestPracticeIds.includes(collectionId)
+  },
+
+  togglePractice(col: PromptColumn, collectionId: string) {
+    const ids = col.settings.target.bestPracticeIds
+    const at = ids.indexOf(collectionId)
+    if (at === -1) ids.push(collectionId)
+    else ids.splice(at, 1)
+    this.persist()
+  },
+
+  /**
+   * Resolve the column's selected collections (in selection order) into the
+   * flat list of enabled rules injected into the enhancer's system prompt.
+   * Ids of collections deleted in Settings are skipped silently.
+   */
+  collectBestPractices(col: PromptColumn): AppliedBestPractice[] {
+    const rules: AppliedBestPractice[] = []
+    for (const id of col.settings.target.bestPracticeIds) {
+      const collection = this.bestPractices.find((c) => c.id === id)
+      if (!collection) continue
+      for (const item of collection.items) {
+        if (!item.enabled || !item.content.trim()) continue
+        rules.push({
+          collection: collection.name,
+          target: collection.target,
+          kind: item.kind,
+          content: item.content,
+        })
+      }
+    }
+    return rules
+  },
+
   /**
    * Enhance the chain link at `index` using only that column's settings,
    * instruction, and text. The result becomes the next column, which starts
@@ -234,9 +284,13 @@ Alpine.data('mainApp', () => ({
         provider,
         model.modelId,
         text,
-        source.settings.options,
-        source.settings.outputLanguage,
-        source.instruction,
+        {
+          options: source.settings.options,
+          outputLanguage: source.settings.outputLanguage,
+          instruction: source.instruction,
+          target: source.settings.target,
+          bestPractices: this.collectBestPractices(source),
+        },
         (_chunk, fullText) => {
           target.text = fullText
         },

@@ -113,7 +113,7 @@
                     <div x-show="col.showAdvanced" class="space-y-3 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
                       <div class="grid grid-cols-3 gap-3">
                         <label class="block">
-                          <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Provider</span>
+                          <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Enhancer provider</span>
                           <select
                             x-model="col.settings.providerId"
                             x-effect="$nextTick(() => { $el.value = col.settings.providerId })"
@@ -127,7 +127,7 @@
                           </select>
                         </label>
                         <label class="block">
-                          <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Target model</span>
+                          <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Enhancer model</span>
                           <select
                             x-model="col.settings.modelId"
                             x-effect="$nextTick(() => { $el.value = col.settings.modelId })"
@@ -168,6 +168,71 @@
                         <label class="flex cursor-pointer items-center gap-1.5">
                           <input type="checkbox" x-model="col.settings.options.preserveIntent" @change="persist()" class="accent-indigo-500" /> Preserve intent
                         </label>
+                      </div>
+
+                      <!-- Target optimization: what the enhanced prompt is FOR (not the enhancer) -->
+                      <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700/70 dark:bg-slate-800/40">
+                        <div class="mb-2 flex items-baseline justify-between">
+                          <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">Target optimization <span class="font-normal text-slate-400 dark:text-slate-500">(optional)</span></span>
+                          <span class="text-[11px] text-slate-400 dark:text-slate-500">where the enhanced prompt will be used</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-3">
+                          <label class="block">
+                            <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Target platform</span>
+                            <input
+                              type="text"
+                              x-model="col.settings.target.platform"
+                              @change="persist()"
+                              list="target-platforms"
+                              placeholder="e.g. Claude Code"
+                              class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            />
+                          </label>
+                          <label class="block">
+                            <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Target model</span>
+                            <input
+                              type="text"
+                              x-model="col.settings.target.model"
+                              @change="persist()"
+                              placeholder="e.g. claude-sonnet-5"
+                              class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            />
+                          </label>
+                          <label class="block">
+                            <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Target type</span>
+                            <input
+                              type="text"
+                              x-model="col.settings.target.type"
+                              @change="persist()"
+                              list="target-types"
+                              placeholder="e.g. Coding agent"
+                              class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                            />
+                          </label>
+                        </div>
+                        <div class="mt-2.5">
+                          <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Best-practice collections</span>
+                          <template x-if="bestPractices.length === 0">
+                            <p class="text-xs text-slate-400 dark:text-slate-500">
+                              None defined yet — create collections in
+                              <a href="/settings.html" class="underline hover:text-slate-600 dark:hover:text-slate-300">Settings</a>.
+                            </p>
+                          </template>
+                          <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-slate-300">
+                            <template x-for="bp in bestPractices" :key="bp.id">
+                              <label class="flex cursor-pointer items-center gap-1.5" :title="bp.target ? `For ${bp.target}` : ''">
+                                <input
+                                  type="checkbox"
+                                  :checked="isPracticeSelected(col, bp.id)"
+                                  @change="togglePractice(col, bp.id)"
+                                  class="accent-indigo-500"
+                                />
+                                <span x-text="bp.name"></span>
+                                <span x-show="bp.target" class="text-slate-400 dark:text-slate-500" x-text="`(${bp.target})`"></span>
+                              </label>
+                            </template>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -239,6 +304,12 @@
             >→</button>
           </div>
 
+          <datalist id="target-platforms">
+            <template x-for="p in targetPlatforms" :key="p"><option :value="p"></option></template>
+          </datalist>
+          <datalist id="target-types">
+            <template x-for="t in targetTypes" :key="t"><option :value="t"></option></template>
+          </datalist>
           <datalist id="languages">
             <option>English</option><option>Persian</option><option>German</option>
             <option>French</option><option>Spanish</option><option>Arabic</option>

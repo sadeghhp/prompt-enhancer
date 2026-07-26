@@ -2,8 +2,8 @@ import Alpine from 'alpinejs'
 import { fetchProviderModels, testModel, testProvider } from './api'
 import { storage } from './storage'
 import { applyTheme, loadTheme, saveTheme } from './theme'
-import { uid } from './types'
-import type { Provider } from './types'
+import { BEST_PRACTICE_KINDS, TARGET_PLATFORMS, uid } from './types'
+import type { BestPracticeCollection, Provider } from './types'
 
 interface TestState {
   status: 'idle' | 'running' | 'ok' | 'error'
@@ -31,6 +31,9 @@ const PICKER_PAGE = 200
 
 Alpine.data('settingsApp', () => ({
   providers: [] as Provider[],
+  bestPractices: [] as BestPracticeCollection[],
+  practiceKinds: BEST_PRACTICE_KINDS,
+  targetPlatforms: TARGET_PLATFORMS,
   /** Test state keyed by provider id or `${providerId}:${modelId}` */
   tests: {} as Record<string, TestState>,
   revealedKeys: {} as Record<string, boolean>,
@@ -46,10 +49,46 @@ Alpine.data('settingsApp', () => ({
 
   init() {
     this.providers = storage.loadProviders()
+    this.bestPractices = storage.loadBestPractices()
   },
 
   persist() {
     storage.saveProviders(this.providers)
+  },
+
+  persistPractices() {
+    storage.saveBestPractices(this.bestPractices)
+  },
+
+  addCollection() {
+    this.bestPractices.push({ id: uid(), name: 'New collection', target: '', items: [] })
+    this.persistPractices()
+  },
+
+  removeCollection(id: string) {
+    const collection = this.bestPractices.find((c) => c.id === id)
+    if (collection?.items.length && !confirm(`Delete "${collection.name}" and its ${collection.items.length} rules?`)) return
+    this.bestPractices = this.bestPractices.filter((c) => c.id !== id)
+    this.persistPractices()
+  },
+
+  addPracticeItem(collection: BestPracticeCollection) {
+    collection.items.push({ id: uid(), kind: 'rule', content: '', enabled: true })
+    this.persistPractices()
+  },
+
+  removePracticeItem(collection: BestPracticeCollection, itemId: string) {
+    collection.items = collection.items.filter((i) => i.id !== itemId)
+    this.persistPractices()
+  },
+
+  /** Move an item up (-1) or down (+1) within its collection. */
+  movePracticeItem(collection: BestPracticeCollection, index: number, delta: number) {
+    const to = index + delta
+    if (to < 0 || to >= collection.items.length) return
+    const [item] = collection.items.splice(index, 1)
+    collection.items.splice(to, 0, item)
+    this.persistPractices()
   },
 
   addProvider() {

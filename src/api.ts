@@ -1,4 +1,5 @@
-import type { EnhanceOptions, Provider } from './types'
+import type { BestPracticeKind, EnhanceOptions, Provider, TargetSettings } from './types'
+import { BEST_PRACTICE_KINDS } from './types'
 
 export interface TestResult {
   ok: boolean
@@ -93,7 +94,60 @@ export async function testModel(provider: Provider, modelId: string): Promise<Te
   }
 }
 
-function buildSystemPrompt(options: EnhanceOptions, outputLanguage: string, instruction?: string): string {
+/** One best-practice rule resolved for injection into the system prompt. */
+export interface AppliedBestPractice {
+  /** Name of the collection the rule belongs to */
+  collection: string
+  /** What the collection targets, e.g. "Claude Code" (may be empty) */
+  target: string
+  kind: BestPracticeKind
+  content: string
+}
+
+/** Everything besides the raw prompt that shapes one enhancement. */
+export interface EnhanceContext {
+  options: EnhanceOptions
+  outputLanguage: string
+  instruction?: string
+  /** What the enhanced prompt should be optimized for (all fields optional) */
+  target?: Pick<TargetSettings, 'platform' | 'model' | 'type'>
+  /** Enabled rules from the column's selected collections, in order */
+  bestPractices?: AppliedBestPractice[]
+}
+
+function kindLabel(kind: BestPracticeKind): string {
+  return BEST_PRACTICE_KINDS.find((k) => k.value === kind)?.label ?? kind
+}
+
+function describeTarget(target: EnhanceContext['target']): string[] {
+  if (!target) return []
+  const parts: string[] = []
+  if (target.platform.trim()) parts.push(`the ${target.platform.trim()} platform`)
+  if (target.model.trim()) parts.push(`the model "${target.model.trim()}"`)
+  if (target.type.trim()) parts.push(`a target of type "${target.type.trim()}"`)
+  if (parts.length === 0) return []
+  return [
+    `The enhanced prompt will be used with ${parts.join(', ')}. Optimize it specifically for that target:`,
+    '- Follow the prompting conventions, formatting preferences, and known strengths of that platform/model/agent type.',
+    '- Phrase instructions the way that target responds to best (e.g. coding agents want concrete file/tool-level tasks and acceptance criteria; reasoning models want the goal stated plainly without over-scripted steps).',
+    '- Do not mention or address the target inside the prompt unless doing so is genuinely useful to it.',
+  ]
+}
+
+function describeBestPractices(rules: AppliedBestPractice[] | undefined): string[] {
+  if (!rules?.length) return []
+  const lines = [
+    'Additionally, apply the following user-defined best practices when rewriting the prompt. They are guidance for HOW to write the enhanced prompt — follow them faithfully, but do not copy them verbatim into the output unless a rule explicitly says to:',
+  ]
+  rules.forEach((r, i) => {
+    const scope = r.target ? `${r.collection} — for ${r.target}` : r.collection
+    lines.push(`${i + 1}. [${scope} · ${kindLabel(r.kind)}]`, r.content.trim())
+  })
+  return lines
+}
+
+function buildSystemPrompt(ctx: EnhanceContext): string {
+  const { options, outputLanguage, instruction } = ctx
   const goals: string[] = ['Fix grammar, spelling, and awkward phrasing.']
   if (options.clarity) goals.push('Maximize clarity and remove ambiguity.')
   if (options.structure) goals.push('Give the prompt a clean structure (role, task, context, constraints, output format) when it helps.')
@@ -104,6 +158,8 @@ function buildSystemPrompt(options: EnhanceOptions, outputLanguage: string, inst
   const lines = [
     'You are an expert prompt engineer. Rewrite the prompt the user gives you into a higher-quality prompt for an LLM or AI agent.',
     ...goals.map((g) => `- ${g}`),
+    ...describeTarget(ctx.target),
+    ...describeBestPractices(ctx.bestPractices),
     `Write the enhanced prompt in ${outputLanguage || 'English'}, regardless of the input language.`,
   ]
   if (instruction?.trim()) {
@@ -120,9 +176,7 @@ export async function enhancePrompt(
   provider: Provider,
   modelId: string,
   prompt: string,
-  options: EnhanceOptions,
-  outputLanguage: string,
-  instruction?: string,
+  context: EnhanceContext,
   onDelta?: (chunk: string, fullText: string) => void,
 ): Promise<string> {
   const res = await fetch(`${normalizeBaseUrl(provider.baseUrl)}/chat/completions`, {
@@ -132,7 +186,7 @@ export async function enhancePrompt(
       model: modelId,
       stream: true,
       messages: [
-        { role: 'system', content: buildSystemPrompt(options, outputLanguage, instruction) },
+        { role: 'system', content: buildSystemPrompt(context) },
         { role: 'user', content: prompt },
       ],
     }),

@@ -16,6 +16,74 @@ export interface Provider {
   defaultModelId?: string
 }
 
+export type BestPracticeKind = 'text' | 'rule' | 'block' | 'cursor' | 'convention'
+
+export const BEST_PRACTICE_KINDS: { value: BestPracticeKind; label: string }[] = [
+  { value: 'text', label: 'Plain-text guidance' },
+  { value: 'rule', label: 'Individual rule' },
+  { value: 'block', label: 'Structured instruction block' },
+  { value: 'cursor', label: 'Cursor-style rule' },
+  { value: 'convention', label: 'Platform prompting convention' },
+]
+
+export interface BestPracticeItem {
+  id: string
+  kind: BestPracticeKind
+  content: string
+  enabled: boolean
+}
+
+/**
+ * A named, ordered set of prompting best practices for one target platform,
+ * model, agent, or agent type. Columns opt into collections by id; only
+ * enabled items are injected into the enhancer's system prompt.
+ */
+export interface BestPracticeCollection {
+  id: string
+  name: string
+  /** What this collection targets (free text), e.g. "Claude Code" */
+  target: string
+  items: BestPracticeItem[]
+}
+
+/**
+ * What the enhanced prompt should be optimized FOR. Independent of the
+ * enhancer provider/model that performs the rewrite. All fields optional.
+ */
+export interface TargetSettings {
+  /** Destination platform, e.g. "Claude Code", "ChatGPT", "Cursor" */
+  platform: string
+  /** Destination model, e.g. "claude-sonnet-5", "gpt-4o" */
+  model: string
+  /** Kind of destination, e.g. "Coding agent"; free text allows custom types */
+  type: string
+  /** BestPracticeCollection ids applied to enhancements from this column */
+  bestPracticeIds: string[]
+}
+
+export const TARGET_PLATFORMS = [
+  'ChatGPT',
+  'Claude',
+  'DeepSeek',
+  'Gemini',
+  'Claude Code',
+  'Cursor',
+  'GitHub Copilot',
+  'Windsurf',
+]
+
+export const TARGET_TYPES = [
+  'General-purpose LLM',
+  'Coding agent',
+  'Research agent',
+  'Reasoning model',
+  'Tool-using agent',
+]
+
+export function defaultTarget(): TargetSettings {
+  return { platform: '', model: '', type: '', bestPracticeIds: [] }
+}
+
 export interface EnhanceOptions {
   clarity: boolean
   structure: boolean
@@ -25,10 +93,14 @@ export interface EnhanceOptions {
 }
 
 export interface ColumnSettings {
+  /** Provider whose model performs the enhancement (the enhancer) */
   providerId: string
+  /** Enhancer model — generates the next prompt version */
   modelId: string
   outputLanguage: string
   options: EnhanceOptions
+  /** Optional: what the enhanced prompt should be optimized for */
+  target: TargetSettings
 }
 
 /**

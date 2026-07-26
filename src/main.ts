@@ -41,7 +41,10 @@ function newColumn(settings: ColumnSettings, overrides: Partial<PromptColumn> = 
     settings: cloneSettings(settings),
     createdAt: Date.now(),
     producedBy: '',
+    reasoning: '',
+    reasoningSeconds: 0,
     showAdvanced: false,
+    showReasoning: false,
     ...overrides,
   }
 }
@@ -65,7 +68,10 @@ function migrateSession(s: Session, providers: Provider[]): void {
     for (const col of s.chain) {
       col.instruction ??= ''
       col.producedBy ??= ''
+      col.reasoning ??= ''
+      col.reasoningSeconds ??= 0
       col.showAdvanced ??= false
+      col.showReasoning ??= false
       col.settings.target ??= defaultTarget()
       col.settings.target.bestPracticeIds ??= []
     }
@@ -112,6 +118,11 @@ Alpine.data('mainApp', () => ({
   targetTypes: TARGET_TYPES,
   activeId: '' as string,
   enhancing: false,
+  /** Column id currently in the reasoning phase; empty when none */
+  thinkingId: '' as string,
+  /** Live elapsed seconds while `thinkingId` is set */
+  thinkingSeconds: 0,
+  _thinkTimer: 0 as ReturnType<typeof setInterval> | 0,
   error: '',
   copiedId: '' as string,
   _copiedTimer: 0 as ReturnType<typeof setTimeout> | 0,
@@ -281,6 +292,25 @@ Alpine.data('mainApp', () => ({
         session.viewIndex = clampView(index, session.chain.length)
       })
     }
+    // Reasoning models stream a chain-of-thought before the answer. The first
+    // reasoning chunk starts the "thinking" phase (pulsing indicator + live
+    // timer); the first content chunk — or the end of the request — ends it,
+    // freezing the elapsed time onto the column for the collapsed summary.
+    const startThinking = () => {
+      if (this.thinkingId === target.id) return
+      this.thinkingId = target.id
+      this.thinkingSeconds = 0
+      const startedAt = Date.now()
+      this._thinkTimer = setInterval(() => {
+        this.thinkingSeconds = Math.round((Date.now() - startedAt) / 1000)
+      }, 1000)
+    }
+    const stopThinking = () => {
+      if (this.thinkingId !== target.id) return
+      clearInterval(this._thinkTimer)
+      target.reasoningSeconds = this.thinkingSeconds
+      this.thinkingId = ''
+    }
     try {
       const enhanced = await enhancePrompt(
         provider,
@@ -293,8 +323,14 @@ Alpine.data('mainApp', () => ({
           target: source.settings.target,
           bestPractices: this.collectBestPractices(source),
         },
-        (_chunk, fullText) => {
-          target.text = fullText
+        (chunk, fullText, kind) => {
+          if (kind === 'reasoning') {
+            startThinking()
+            target.reasoning += chunk
+          } else {
+            stopThinking()
+            target.text = fullText
+          }
         },
       )
       target.text = enhanced
@@ -306,8 +342,14 @@ Alpine.data('mainApp', () => ({
       this.error = err instanceof Error ? err.message : String(err)
       this.persist()
     } finally {
+      stopThinking()
       this.enhancing = false
     }
+  },
+
+  toggleReasoning(col: PromptColumn) {
+    col.showReasoning = !col.showReasoning
+    this.persist()
   },
 
   prevView() {

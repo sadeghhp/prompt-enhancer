@@ -241,6 +241,34 @@
                     </div>
                   </div>
 
+                  <!-- Reasoning: chain-of-thought captured while producing this link.
+                       One strip morphs from live "Thinking…" into a collapsed,
+                       expandable "Thought for Ns" summary — collapsed by default. -->
+                  <div x-show="col.reasoning || thinkingId === col.id" x-cloak class="card-inset">
+                    <button
+                      type="button"
+                      @click="toggleReasoning(col)"
+                      :aria-expanded="col.showReasoning"
+                      class="thinking-header"
+                    >
+                      <span class="thinking-dot" :class="thinkingId === col.id ? 'is-pulsing' : ''" aria-hidden="true"></span>
+                      <span
+                        class="font-medium text-(--text-secondary)"
+                        x-text="thinkingId === col.id
+                          ? `Thinking… ${thinkingSeconds}s`
+                          : (col.reasoningSeconds ? `Thought for ${col.reasoningSeconds}s` : 'Reasoning')"
+                      ></span>
+                      <span class="ml-auto text-(--text-muted)" x-text="col.showReasoning ? '▲' : '▼'"></span>
+                    </button>
+                    <div x-show="col.showReasoning" role="region" aria-label="Model reasoning">
+                      <pre
+                        class="thinking-text"
+                        x-text="col.reasoning || 'Waiting for the model\'s reasoning…'"
+                        x-effect="if (thinkingId === col.id && col.reasoning) $el.scrollTop = $el.scrollHeight"
+                      ></pre>
+                    </div>
+                  </div>
+
                   <!-- Editable prompt text -->
                   <div class="chain-editor card flex min-h-0 flex-1 flex-col">
                     <div class="border-b border-(--border-default) px-4 py-2.5 text-sm font-semibold text-(--text-primary)" x-text="i === 0 ? 'Your prompt' : 'Enhanced prompt'"></div>

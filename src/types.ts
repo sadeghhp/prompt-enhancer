@@ -118,8 +118,14 @@ export interface PromptColumn {
   createdAt: number
   /** Provider/model that generated this column's text; empty for the first link */
   producedBy: string
+  /** Chain-of-thought a reasoning model streamed while producing this text */
+  reasoning: string
+  /** Seconds the model spent reasoning; 0 when it exposed no reasoning */
+  reasoningSeconds: number
   /** UI state: whether this column's advanced settings panel is expanded */
   showAdvanced: boolean
+  /** UI state: whether this column's reasoning section is expanded */
+  showReasoning: boolean
 }
 
 export interface Session {

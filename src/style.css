@@ -237,6 +237,72 @@
     font-weight: 600;
     opacity: 0.8;
   }
+
+  /* Reasoning disclosure: one strip that morphs from a live "Thinking…"
+     indicator (pulsing dot) into a collapsed "Thought for Ns" toggle. */
+  .thinking-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    font-size: 0.75rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+  .thinking-header:hover {
+    background: var(--surface-hover);
+  }
+  .thinking-header:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-ring);
+  }
+
+  /* Accent, not a status color: thinking is activity, not a status */
+  .thinking-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    flex-shrink: 0;
+    border-radius: calc(infinity * 1px);
+    background: var(--accent);
+  }
+  .thinking-dot.is-pulsing {
+    animation: thinking-pulse 1.4s ease-in-out infinite;
+  }
+
+  /* Long chains of thought scroll inside the strip instead of growing it */
+  .thinking-text {
+    max-height: 12rem;
+    overflow-y: auto;
+    padding: 0 0.75rem 0.625rem;
+    font-family: inherit;
+    font-size: 0.75rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+
+@keyframes thinking-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 var(--accent-ring);
+  }
+  50% {
+    opacity: 0.5;
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking-dot.is-pulsing {
+    animation: none;
+    opacity: 0.7;
+  }
 }
 
 /* ---------------------------------------------------------------------------

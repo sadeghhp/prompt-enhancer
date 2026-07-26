@@ -172,12 +172,15 @@ function buildSystemPrompt(ctx: EnhanceContext): string {
   return lines.join('\n')
 }
 
+/** Which part of the response a streamed chunk belongs to. */
+export type DeltaKind = 'content' | 'reasoning'
+
 export async function enhancePrompt(
   provider: Provider,
   modelId: string,
   prompt: string,
   context: EnhanceContext,
-  onDelta?: (chunk: string, fullText: string) => void,
+  onDelta?: (chunk: string, fullText: string, kind: DeltaKind) => void,
 ): Promise<string> {
   const res = await fetch(`${normalizeBaseUrl(provider.baseUrl)}/chat/completions`, {
     method: 'POST',
@@ -194,9 +197,15 @@ export async function enhancePrompt(
   if (!res.ok) {
     throw new Error(`Provider error (HTTP ${res.status}): ${await safeError(res)}`)
   }
-  const text = res.headers.get('content-type')?.includes('text/event-stream')
-    ? await readSseStream(res, onDelta)
-    : extractCompletionText(await res.json())
+  let text: string
+  if (res.headers.get('content-type')?.includes('text/event-stream')) {
+    text = await readSseStream(res, onDelta)
+  } else {
+    const data = await res.json()
+    const reasoning = extractCompletionReasoning(data)
+    if (reasoning) onDelta?.(reasoning, '', 'reasoning')
+    text = extractCompletionText(data)
+  }
   if (!text.trim()) {
     throw new Error('The model returned an empty response.')
   }
@@ -209,9 +218,16 @@ function extractCompletionText(data: unknown): string {
   return typeof text === 'string' ? text : ''
 }
 
+/** Reasoning models expose their chain-of-thought under a non-standard key. */
+function extractCompletionReasoning(data: unknown): string {
+  const msg = (data as any)?.choices?.[0]?.message
+  const reasoning = msg?.reasoning_content ?? msg?.reasoning
+  return typeof reasoning === 'string' ? reasoning : ''
+}
+
 async function readSseStream(
   res: Response,
-  onDelta?: (chunk: string, fullText: string) => void,
+  onDelta?: (chunk: string, fullText: string, kind: DeltaKind) => void,
 ): Promise<string> {
   if (!res.body) throw new Error('The provider response has no body to stream.')
   const reader = res.body.getReader()
@@ -232,10 +248,16 @@ async function readSseStream(
     if (event?.error) {
       throw new Error(event.error.message ?? 'The provider reported a streaming error.')
     }
-    const chunk = event?.choices?.[0]?.delta?.content
+    const delta = event?.choices?.[0]?.delta
+    // DeepSeek uses `reasoning_content`; OpenRouter and others use `reasoning`
+    const reasoning = delta?.reasoning_content ?? delta?.reasoning
+    if (typeof reasoning === 'string' && reasoning) {
+      onDelta?.(reasoning, fullText, 'reasoning')
+    }
+    const chunk = delta?.content
     if (typeof chunk === 'string' && chunk) {
       fullText += chunk
-      onDelta?.(chunk, fullText)
+      onDelta?.(chunk, fullText, 'content')
     }
   }
 

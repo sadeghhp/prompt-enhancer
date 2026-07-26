@@ -29,6 +29,7 @@ on `<html>` (see `@custom-variant dark` in style.css), not the OS setting.
 | `--surface-field` | Inputs, selects, textareas |
 | `--surface-hover` | Hover fill for ghost/outline controls and list rows |
 | `--surface-header` | Translucent page-header bar (pairs with `backdrop-blur`) |
+| `--surface-pop` | Opaque floating panels (advanced-settings overlay) |
 | `--border-default` | Card borders, dividers |
 | `--border-strong` | Field borders, outline buttons, dashed empty states |
 | `--text-primary` | Headings, titles, field values |
@@ -77,7 +78,8 @@ Three radii, via tokens — pick by component size, never arbitrary values:
 ### Shadows
 
 Understated only: `--shadow-card` on `.card` and the version badge;
-`--shadow-pop` reserved for future overlays. No other shadows, no glows.
+`--shadow-pop` on floating overlays (`.advanced-panel`). No other shadows,
+no glows.
 
 ### Component classes (defined in `src/style.css`)
 
@@ -135,6 +137,10 @@ number = the column's 1-based position in the chain. Rules:
 - Each `.chain-card` is an `@container`: per-column form grids use container
   variants (`grid-cols-2 @lg:grid-cols-3`) so density tracks the column's
   own width, not the viewport. Advanced settings use `.field-xs` fields.
+- Advanced settings open as an in-column overlay (`.advanced-panel`,
+  `--surface-pop` + `--shadow-pop`) over the editor + instruction area —
+  never in-flow, so opening them displaces nothing; the Enhance button
+  stays visible below the panel and the panel body scrolls internally.
 - The per-column Enhance button is `w-1/3`, right-aligned in its column.
 - Nothing may overflow the viewport horizontally except the chain track
   itself.

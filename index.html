@@ -206,157 +206,27 @@
                     </span>
                   </div>
 
-                  <!-- Advanced settings (independent per column) — high-density:
-                       container-query grids tighten to the column's own width -->
-                  <div class="card">
-                    <button @click="col.showAdvanced = !col.showAdvanced; persist()" class="flex w-full items-center justify-between px-3 py-2">
+                  <!-- Advanced settings trigger (independent per column). The
+                       settings themselves open as an overlay panel over the
+                       editor area below (see .advanced-panel), so toggling
+                       never displaces the editor, instruction, or Enhance. -->
+                  <div class="card" :class="col.showAdvanced ? 'ring-1 ring-(--accent-ring)' : ''">
+                    <button
+                      @click="toggleAdvanced(col)"
+                      :aria-expanded="col.showAdvanced"
+                      class="flex w-full items-center gap-2 px-3 py-2"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="h-3.5 w-3.5 shrink-0 text-(--text-muted)" aria-hidden="true">
+                        <line x1="21" y1="7" x2="14" y2="7" /><line x1="10" y1="7" x2="3" y2="7" />
+                        <line x1="21" y1="17" x2="16" y2="17" /><line x1="12" y1="17" x2="3" y2="17" />
+                        <line x1="14" y1="5" x2="14" y2="9" /><line x1="16" y1="15" x2="16" y2="19" />
+                      </svg>
                       <span class="text-sm font-semibold text-(--text-primary)">Advanced settings</span>
-                      <span class="text-xs text-(--text-muted)" x-text="col.showAdvanced ? '▲' : '▼'"></span>
+                      <span class="min-w-0 flex-1 truncate text-right text-xs text-(--text-muted)" x-text="advancedSummary(col)"></span>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5 shrink-0 text-(--text-muted) transition-transform duration-200 motion-reduce:transition-none" :class="col.showAdvanced ? 'rotate-180' : ''" aria-hidden="true">
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
                     </button>
-                    <div x-show="col.showAdvanced" class="advanced-body space-y-2.5 border-t border-(--border-default) px-3 py-2.5">
-                      <div class="grid grid-cols-2 gap-2 @lg:grid-cols-3">
-                        <label class="block">
-                          <span class="field-label">Enhancer provider</span>
-                          <select
-                            x-model="col.settings.providerId"
-                            x-effect="$nextTick(() => { $el.value = col.settings.providerId })"
-                            @change="onProviderChange(col)"
-                            class="field field-xs"
-                          >
-                            <option value="" disabled>Select…</option>
-                            <template x-for="p in providers" :key="p.id">
-                              <option :value="p.id" x-text="p.name"></option>
-                            </template>
-                          </select>
-                        </label>
-                        <label class="block">
-                          <span class="field-label">Enhancer model</span>
-                          <select
-                            x-model="col.settings.modelId"
-                            x-effect="$nextTick(() => { $el.value = col.settings.modelId })"
-                            @change="persist()"
-                            class="field field-xs"
-                          >
-                            <option value="" disabled>Select…</option>
-                            <template x-for="m in modelsFor(col)" :key="m.id">
-                              <option :value="m.id" x-text="m.label || m.modelId"></option>
-                            </template>
-                          </select>
-                        </label>
-                        <label class="block">
-                          <span class="field-label">Output language</span>
-                          <input
-                            type="text"
-                            x-model="col.settings.outputLanguage"
-                            @change="persist()"
-                            list="languages"
-                            placeholder="English"
-                            class="field field-xs"
-                          />
-                        </label>
-                        <label class="block">
-                          <span class="field-label">Output format</span>
-                          <select
-                            x-model="col.settings.outputFormat"
-                            x-effect="$nextTick(() => { $el.value = col.settings.outputFormat })"
-                            @change="persist()"
-                            class="field field-xs"
-                          >
-                            <template x-for="f in outputFormats" :key="f.value">
-                              <option :value="f.value" x-text="f.label"></option>
-                            </template>
-                          </select>
-                        </label>
-                      </div>
-                      <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-(--text-secondary) @lg:grid-cols-3">
-                        <label class="flex cursor-pointer items-center gap-1.5">
-                          <input type="checkbox" x-model="col.settings.options.clarity" @change="persist()" class="checkbox" /> Clarity
-                        </label>
-                        <label class="flex cursor-pointer items-center gap-1.5">
-                          <input type="checkbox" x-model="col.settings.options.structure" @change="persist()" class="checkbox" /> Structure
-                        </label>
-                        <label class="flex cursor-pointer items-center gap-1.5">
-                          <input type="checkbox" x-model="col.settings.options.bestPractices" @change="persist()" class="checkbox" /> Best practices
-                        </label>
-                        <label class="flex cursor-pointer items-center gap-1.5">
-                          <input type="checkbox" x-model="col.settings.options.tokenEfficiency" @change="persist()" class="checkbox" /> Token efficiency
-                        </label>
-                        <label class="flex cursor-pointer items-center gap-1.5">
-                          <input type="checkbox" x-model="col.settings.options.preserveIntent" @change="persist()" class="checkbox" /> Preserve intent
-                        </label>
-                        <label class="flex cursor-pointer items-center gap-1.5" title="Force a tight rewrite — brevity, efficiency, and clarity — without weakening the prompt">
-                          <input type="checkbox" x-model="col.settings.options.brevity" @change="persist()" class="checkbox" /> Brevity
-                        </label>
-                        <label class="flex cursor-pointer items-center gap-1.5" title="Append a short explanation of the changes after the enhanced prompt">
-                          <input type="checkbox" x-model="col.settings.options.commentary" @change="persist()" class="checkbox" /> Commentary
-                        </label>
-                      </div>
-
-                      <!-- Target optimization: what the enhanced prompt is FOR (not the enhancer) -->
-                      <div class="card-inset p-2.5">
-                        <div class="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-2">
-                          <span class="text-xs font-semibold text-(--text-secondary)">Target optimization <span class="font-normal text-(--text-faint)">(optional)</span></span>
-                          <span class="hidden text-xs text-(--text-faint) @lg:inline">where the enhanced prompt will be used</span>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2 @lg:grid-cols-3">
-                          <label class="block">
-                            <span class="field-label">Target platform</span>
-                            <input
-                              type="text"
-                              x-model="col.settings.target.platform"
-                              @change="persist()"
-                              list="target-platforms"
-                              placeholder="e.g. Claude Code"
-                              class="field field-xs"
-                            />
-                          </label>
-                          <label class="block">
-                            <span class="field-label">Target model</span>
-                            <input
-                              type="text"
-                              x-model="col.settings.target.model"
-                              @change="persist()"
-                              placeholder="e.g. claude-sonnet-5"
-                              class="field field-xs"
-                            />
-                          </label>
-                          <label class="col-span-2 block @lg:col-span-1">
-                            <span class="field-label">Target type</span>
-                            <input
-                              type="text"
-                              x-model="col.settings.target.type"
-                              @change="persist()"
-                              list="target-types"
-                              placeholder="e.g. Coding agent"
-                              class="field field-xs"
-                            />
-                          </label>
-                        </div>
-                        <div class="mt-2">
-                          <span class="field-label">Best-practice collections</span>
-                          <template x-if="bestPractices.length === 0">
-                            <p class="text-xs text-(--text-faint)">
-                              None defined yet — create collections in
-                              <a href="./settings.html" class="underline hover:text-(--text-secondary)">Settings</a>.
-                            </p>
-                          </template>
-                          <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-(--text-secondary)">
-                            <template x-for="bp in bestPractices" :key="bp.id">
-                              <label class="flex cursor-pointer items-center gap-1.5" :title="bp.target ? `For ${bp.target}` : ''">
-                                <input
-                                  type="checkbox"
-                                  :checked="isPracticeSelected(col, bp.id)"
-                                  @change="togglePractice(col, bp.id)"
-                                  class="checkbox"
-                                />
-                                <span x-text="bp.name"></span>
-                                <span x-show="bp.target" class="text-(--text-faint)" x-text="`(${bp.target})`"></span>
-                              </label>
-                            </template>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
 
                   <!-- Reasoning: chain-of-thought captured while producing this link.
@@ -389,35 +259,204 @@
 
                   <!-- Prompt editor + instruction + Enhance form one pinned
                        group: it grows to fill the space left by the header,
-                       advanced, and reasoning panels above, so the instruction
+                       trigger, and reasoning panels above, so the instruction
                        and Enhance button always sit at the bottom of the prompt
-                       area — expanding advanced settings shrinks the editor
-                       (which scrolls), never buries these controls. -->
+                       area. The inner wrapper is the positioning context for
+                       the Advanced settings overlay: the panel floats over the
+                       editor + instruction only, leaving Enhance visible. -->
                   <div class="chain-editor-group flex min-h-0 flex-1 flex-col gap-2.5">
-                    <!-- Editable prompt text -->
-                    <div class="chain-editor card flex min-h-0 flex-1 flex-col">
-                      <div class="border-b border-(--border-default) px-3 py-2 text-sm font-semibold text-(--text-primary)" x-text="i === 0 ? 'Your prompt' : 'Enhanced prompt'"></div>
-                      <textarea
-                        x-model="col.text"
-                        @input="touch()"
-                        :placeholder="i === 0 ? 'Write or paste the prompt you want to enhance — any language works.' : 'The enhanced prompt appears here — edit it freely before the next enhancement.'"
-                        class="min-h-0 flex-1 resize-none bg-transparent p-3 text-sm leading-relaxed text-(--text-primary) placeholder:text-(--text-faint) focus:outline-none"
-                      ></textarea>
-                    </div>
-
-                    <!-- Enhancement instruction (independent per column) -->
-                    <div class="card shrink-0">
-                      <div class="flex flex-wrap items-baseline justify-between gap-x-2 border-b border-(--border-default) px-3 py-1.5">
-                        <span class="text-sm font-semibold text-(--text-primary)">Instruction <span class="font-normal text-(--text-faint)">(optional)</span></span>
-                        <span class="hidden text-xs text-(--text-muted) @lg:inline">guides this column's enhancement</span>
+                    <div class="relative flex min-h-0 flex-1 flex-col gap-2.5">
+                      <!-- Editable prompt text -->
+                      <div class="chain-editor card flex min-h-0 flex-1 flex-col">
+                        <div class="border-b border-(--border-default) px-3 py-2 text-sm font-semibold text-(--text-primary)" x-text="i === 0 ? 'Your prompt' : 'Enhanced prompt'"></div>
+                        <textarea
+                          x-model="col.text"
+                          @input="touch()"
+                          :placeholder="i === 0 ? 'Write or paste the prompt you want to enhance — any language works.' : 'The enhanced prompt appears here — edit it freely before the next enhancement.'"
+                          class="min-h-0 flex-1 resize-none bg-transparent p-3 text-sm leading-relaxed text-(--text-primary) placeholder:text-(--text-faint) focus:outline-none"
+                        ></textarea>
                       </div>
-                      <textarea
-                        x-model="col.instruction"
-                        @input="persist()"
-                        rows="2"
-                        placeholder="e.g. Make it more formal · Turn it into a step-by-step task"
-                        class="w-full resize-none bg-transparent px-3 py-2 text-sm leading-relaxed text-(--text-primary) placeholder:text-(--text-faint) focus:outline-none"
-                      ></textarea>
+
+                      <!-- Enhancement instruction (independent per column) -->
+                      <div class="card shrink-0">
+                        <div class="flex flex-wrap items-baseline justify-between gap-x-2 border-b border-(--border-default) px-3 py-1.5">
+                          <span class="text-sm font-semibold text-(--text-primary)">Instruction <span class="font-normal text-(--text-faint)">(optional)</span></span>
+                          <span class="hidden text-xs text-(--text-muted) @lg:inline">guides this column's enhancement</span>
+                        </div>
+                        <textarea
+                          x-model="col.instruction"
+                          @input="persist()"
+                          rows="2"
+                          placeholder="e.g. Make it more formal · Turn it into a step-by-step task"
+                          class="w-full resize-none bg-transparent px-3 py-2 text-sm leading-relaxed text-(--text-primary) placeholder:text-(--text-faint) focus:outline-none"
+                        ></textarea>
+                      </div>
+                      <!-- Advanced settings overlay: floats over the editor
+                           + instruction area, so opening it never displaces
+                           them or the Enhance button below -->
+                      <div
+                        x-show="col.showAdvanced"
+                        x-cloak
+                        @keydown.escape.window="col.showAdvanced && closeAdvanced(col)"
+                        x-transition:enter="transition duration-200 ease-out motion-reduce:transition-none"
+                        x-transition:enter-start="translate-y-2 opacity-0"
+                        x-transition:enter-end="translate-y-0 opacity-100"
+                        x-transition:leave="transition duration-150 ease-in motion-reduce:transition-none"
+                        x-transition:leave-start="translate-y-0 opacity-100"
+                        x-transition:leave-end="translate-y-2 opacity-0"
+                        role="region"
+                        aria-label="Advanced settings"
+                        class="advanced-panel"
+                      >
+                        <div class="flex items-center justify-between gap-2 border-b border-(--border-default) px-3 py-2">
+                          <span class="text-sm font-semibold text-(--text-primary)">Advanced settings</span>
+                          <button @click="closeAdvanced(col)" class="btn btn-soft btn-xs">Done</button>
+                        </div>
+                        <div class="advanced-panel-body space-y-2.5 px-3 py-2.5">
+                          <div class="grid grid-cols-2 gap-2 @lg:grid-cols-3">
+                            <label class="block">
+                              <span class="field-label">Enhancer provider</span>
+                              <select
+                                x-model="col.settings.providerId"
+                                x-effect="$nextTick(() => { $el.value = col.settings.providerId })"
+                                @change="onProviderChange(col)"
+                                class="field field-xs"
+                              >
+                                <option value="" disabled>Select…</option>
+                                <template x-for="p in providers" :key="p.id">
+                                  <option :value="p.id" x-text="p.name"></option>
+                                </template>
+                              </select>
+                            </label>
+                            <label class="block">
+                              <span class="field-label">Enhancer model</span>
+                              <select
+                                x-model="col.settings.modelId"
+                                x-effect="$nextTick(() => { $el.value = col.settings.modelId })"
+                                @change="persist()"
+                                class="field field-xs"
+                              >
+                                <option value="" disabled>Select…</option>
+                                <template x-for="m in modelsFor(col)" :key="m.id">
+                                  <option :value="m.id" x-text="m.label || m.modelId"></option>
+                                </template>
+                              </select>
+                            </label>
+                            <label class="block">
+                              <span class="field-label">Output language</span>
+                              <input
+                                type="text"
+                                x-model="col.settings.outputLanguage"
+                                @change="persist()"
+                                list="languages"
+                                placeholder="English"
+                                class="field field-xs"
+                              />
+                            </label>
+                            <label class="block">
+                              <span class="field-label">Output format</span>
+                              <select
+                                x-model="col.settings.outputFormat"
+                                x-effect="$nextTick(() => { $el.value = col.settings.outputFormat })"
+                                @change="persist()"
+                                class="field field-xs"
+                              >
+                                <template x-for="f in outputFormats" :key="f.value">
+                                  <option :value="f.value" x-text="f.label"></option>
+                                </template>
+                              </select>
+                            </label>
+                          </div>
+                          <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-(--text-secondary) @lg:grid-cols-3">
+                            <label class="flex cursor-pointer items-center gap-1.5">
+                              <input type="checkbox" x-model="col.settings.options.clarity" @change="persist()" class="checkbox" /> Clarity
+                            </label>
+                            <label class="flex cursor-pointer items-center gap-1.5">
+                              <input type="checkbox" x-model="col.settings.options.structure" @change="persist()" class="checkbox" /> Structure
+                            </label>
+                            <label class="flex cursor-pointer items-center gap-1.5">
+                              <input type="checkbox" x-model="col.settings.options.bestPractices" @change="persist()" class="checkbox" /> Best practices
+                            </label>
+                            <label class="flex cursor-pointer items-center gap-1.5">
+                              <input type="checkbox" x-model="col.settings.options.tokenEfficiency" @change="persist()" class="checkbox" /> Token efficiency
+                            </label>
+                            <label class="flex cursor-pointer items-center gap-1.5">
+                              <input type="checkbox" x-model="col.settings.options.preserveIntent" @change="persist()" class="checkbox" /> Preserve intent
+                            </label>
+                            <label class="flex cursor-pointer items-center gap-1.5" title="Force a tight rewrite — brevity, efficiency, and clarity — without weakening the prompt">
+                              <input type="checkbox" x-model="col.settings.options.brevity" @change="persist()" class="checkbox" /> Brevity
+                            </label>
+                            <label class="flex cursor-pointer items-center gap-1.5" title="Append a short explanation of the changes after the enhanced prompt">
+                              <input type="checkbox" x-model="col.settings.options.commentary" @change="persist()" class="checkbox" /> Commentary
+                            </label>
+                          </div>
+
+                          <!-- Target optimization: what the enhanced prompt is FOR (not the enhancer) -->
+                          <div class="card-inset p-2.5">
+                            <div class="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-2">
+                              <span class="text-xs font-semibold text-(--text-secondary)">Target optimization <span class="font-normal text-(--text-faint)">(optional)</span></span>
+                              <span class="hidden text-xs text-(--text-faint) @lg:inline">where the enhanced prompt will be used</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 @lg:grid-cols-3">
+                              <label class="block">
+                                <span class="field-label">Target platform</span>
+                                <input
+                                  type="text"
+                                  x-model="col.settings.target.platform"
+                                  @change="persist()"
+                                  list="target-platforms"
+                                  placeholder="e.g. Claude Code"
+                                  class="field field-xs"
+                                />
+                              </label>
+                              <label class="block">
+                                <span class="field-label">Target model</span>
+                                <input
+                                  type="text"
+                                  x-model="col.settings.target.model"
+                                  @change="persist()"
+                                  placeholder="e.g. claude-sonnet-5"
+                                  class="field field-xs"
+                                />
+                              </label>
+                              <label class="col-span-2 block @lg:col-span-1">
+                                <span class="field-label">Target type</span>
+                                <input
+                                  type="text"
+                                  x-model="col.settings.target.type"
+                                  @change="persist()"
+                                  list="target-types"
+                                  placeholder="e.g. Coding agent"
+                                  class="field field-xs"
+                                />
+                              </label>
+                            </div>
+                            <div class="mt-2">
+                              <span class="field-label">Best-practice collections</span>
+                              <template x-if="bestPractices.length === 0">
+                                <p class="text-xs text-(--text-faint)">
+                                  None defined yet — create collections in
+                                  <a href="./settings.html" class="underline hover:text-(--text-secondary)">Settings</a>.
+                                </p>
+                              </template>
+                              <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-(--text-secondary)">
+                                <template x-for="bp in bestPractices" :key="bp.id">
+                                  <label class="flex cursor-pointer items-center gap-1.5" :title="bp.target ? `For ${bp.target}` : ''">
+                                    <input
+                                      type="checkbox"
+                                      :checked="isPracticeSelected(col, bp.id)"
+                                      @change="togglePractice(col, bp.id)"
+                                      class="checkbox"
+                                    />
+                                    <span x-text="bp.name"></span>
+                                    <span x-show="bp.target" class="text-(--text-faint)" x-text="`(${bp.target})`"></span>
+                                  </label>
+                                </template>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <!-- Enhance: generates the next link in the chain -->

@@ -17,6 +17,7 @@
   --surface-field: var(--color-white);
   --surface-hover: var(--color-slate-100);
   --surface-header: color-mix(in oklab, var(--color-white) 70%, transparent);
+  --surface-pop: var(--color-white);
 
   /* Borders */
   --border-default: var(--color-slate-200);
@@ -67,6 +68,7 @@
   --surface-field: var(--color-slate-800);
   --surface-hover: color-mix(in oklab, var(--color-slate-800) 70%, transparent);
   --surface-header: color-mix(in oklab, var(--color-slate-900) 70%, transparent);
+  --surface-pop: var(--color-slate-900);
 
   --border-default: var(--color-slate-800);
   --border-strong: var(--color-slate-700);
@@ -402,6 +404,30 @@ body {
     max-width: 100%;
   }
 
+  /* Advanced settings overlay: absolutely covers the editor + instruction
+     area of its column (that wrapper is position:relative), so opening it
+     never displaces the editor, instruction, or Enhance button. Needs an
+     opaque surface (--surface-pop) — the dark card surface is translucent —
+     and --shadow-pop to read as a floating layer. Body scrolls internally. */
+  .advanced-panel {
+    position: absolute;
+    inset: 0;
+    bottom: auto;
+    max-height: 100%;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-pop);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-pop);
+  }
+  .advanced-panel-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
   /* Long chains of thought scroll inside the strip instead of growing it */
   .thinking-text {
     max-height: 12rem;
@@ -462,19 +488,15 @@ body {
   flex-shrink: 0;
 }
 /* The editor group is the one column child allowed to shrink: it soaks up the
-   space left by the header/advanced/reasoning panels, keeping the instruction
-   and Enhance button pinned to the bottom of the prompt area at all times. */
+   space left by the header/trigger/reasoning panels, keeping the instruction
+   and Enhance button pinned to the bottom of the prompt area at all times.
+   Advanced settings open as an overlay (.advanced-panel) over the editor +
+   instruction area, so they never grow the column. */
 .chain-card > .chain-editor-group {
   flex-shrink: 1;
 }
 .chain-editor {
   min-height: 10rem;
-}
-/* Expanding advanced settings must never push the prompt controls off-column:
-   cap the panel and let it scroll inside itself instead of growing the column. */
-.advanced-body {
-  max-height: 40vh;
-  overflow-y: auto;
 }
 
 /* Links behind the leading column are history: faded and inert */

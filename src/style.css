@@ -1,0 +1,23 @@
+@import 'tailwindcss';
+
+[x-cloak] {
+  display: none !important;
+}
+
+/* Version carousel: track slides horizontally, one card per version */
+.version-track {
+  display: flex;
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.version-card {
+  flex: 0 0 100%;
+  min-width: 0;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
+.version-card[data-hidden='true'] {
+  opacity: 0.15;
+  transform: scale(0.96);
+  pointer-events: none;
+}

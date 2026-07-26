@@ -5,29 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Prompt Enhancer</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>" />
+    <script>
+      // Apply the saved theme before first paint to avoid a flash
+      const saved = localStorage.getItem('pe.theme')
+      if (saved === 'dark' || (!saved && matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark')
+      }
+    </script>
     <link rel="stylesheet" href="/src/style.css" />
     <script type="module" src="/src/main.ts"></script>
   </head>
-  <body class="h-full bg-slate-950 text-slate-200 antialiased">
+  <body class="h-full bg-slate-100 text-slate-700 antialiased dark:bg-slate-950 dark:text-slate-200">
     <div x-data="mainApp" x-cloak class="flex h-full flex-col">
       <!-- Header -->
-      <header class="flex items-center justify-between border-b border-slate-800 bg-slate-900/70 px-6 py-3 backdrop-blur">
+      <header class="flex items-center justify-between border-b border-slate-200 bg-white/70 px-6 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
         <a href="/" class="flex items-center gap-2.5">
           <span class="grid size-8 place-items-center rounded-lg bg-indigo-500/20 text-lg">✨</span>
-          <span class="text-base font-semibold tracking-tight text-white">Prompt Enhancer</span>
+          <span class="text-base font-semibold tracking-tight text-slate-900 dark:text-white">Prompt Enhancer</span>
         </a>
         <nav class="flex items-center gap-1 text-sm">
-          <a href="/" class="rounded-lg bg-slate-800 px-3 py-1.5 font-medium text-white">Enhance</a>
-          <a href="/settings.html" class="rounded-lg px-3 py-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-white">Settings</a>
+          <a href="/" class="rounded-lg bg-slate-200 px-3 py-1.5 font-medium text-slate-900 dark:bg-slate-800 dark:text-white">Enhance</a>
+          <a href="/settings.html" class="rounded-lg px-3 py-1.5 text-slate-500 transition hover:bg-slate-200 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">Settings</a>
+          <button
+            @click="toggleTheme()"
+            :title="theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+            class="ml-1 rounded-lg px-2.5 py-1.5 text-slate-500 transition hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800"
+            x-text="theme === 'dark' ? '☀️' : '🌙'"
+          ></button>
         </nav>
       </header>
 
       <!-- Main: three columns -->
       <main class="grid min-h-0 flex-1 grid-cols-[16rem_1fr_1fr] gap-4 p-4">
         <!-- Left: sessions -->
-        <aside class="flex min-h-0 flex-col rounded-2xl border border-slate-800 bg-slate-900/50">
-          <div class="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-            <h2 class="text-sm font-semibold text-white">Sessions</h2>
+        <aside class="flex min-h-0 flex-col rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
+          <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Sessions</h2>
             <button
               @click="createSession()"
               class="rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-indigo-500"
@@ -39,10 +52,10 @@
                 <button
                   @click="openSession(s.id)"
                   class="group flex w-full items-start justify-between gap-2 rounded-xl px-3 py-2 text-left transition"
-                  :class="s.id === activeId ? 'bg-indigo-500/15 ring-1 ring-indigo-500/40' : 'hover:bg-slate-800/70'"
+                  :class="s.id === activeId ? 'bg-indigo-500/10 ring-1 ring-indigo-500/40 dark:bg-indigo-500/15' : 'hover:bg-slate-100 dark:hover:bg-slate-800/70'"
                 >
                   <span class="min-w-0">
-                    <span class="block truncate text-sm" :class="s.id === activeId ? 'text-white' : 'text-slate-300'" x-text="s.title"></span>
+                    <span class="block truncate text-sm" :class="s.id === activeId ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'" x-text="s.title"></span>
                     <span class="mt-0.5 block text-xs text-slate-500">
                       <span x-text="formatDate(s.updatedAt)"></span>
                       · <span x-text="s.versions.length"></span>v
@@ -51,7 +64,7 @@
                   <span
                     @click.stop="deleteSession(s.id)"
                     title="Delete session"
-                    class="mt-0.5 hidden shrink-0 cursor-pointer text-slate-500 hover:text-rose-400 group-hover:block"
+                    class="mt-0.5 hidden shrink-0 cursor-pointer text-slate-500 hover:text-rose-500 group-hover:block dark:hover:text-rose-400"
                   >✕</span>
                 </button>
               </li>
@@ -62,25 +75,25 @@
         <!-- Middle: editor -->
         <section class="flex min-h-0 flex-col gap-3">
           <!-- Advanced settings -->
-          <div class="rounded-2xl border border-slate-800 bg-slate-900/50">
+          <div class="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
             <button @click="showAdvanced = !showAdvanced" class="flex w-full items-center justify-between px-4 py-3">
-              <span class="text-sm font-semibold text-white">Advanced settings</span>
-              <span class="text-xs text-slate-400" x-text="showAdvanced ? '▲' : '▼'"></span>
+              <span class="text-sm font-semibold text-slate-900 dark:text-white">Advanced settings</span>
+              <span class="text-xs text-slate-500 dark:text-slate-400" x-text="showAdvanced ? '▲' : '▼'"></span>
             </button>
-            <div x-show="showAdvanced" class="space-y-3 border-t border-slate-800 px-4 py-3">
+            <div x-show="showAdvanced" class="space-y-3 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
               <template x-if="providers.length === 0">
-                <p class="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+                <p class="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
                   No providers configured yet —
-                  <a href="/settings.html" class="underline hover:text-amber-200">add one in Settings</a>.
+                  <a href="/settings.html" class="underline hover:text-amber-800 dark:hover:text-amber-200">add one in Settings</a>.
                 </p>
               </template>
               <div class="grid grid-cols-3 gap-3">
                 <label class="block">
-                  <span class="mb-1 block text-xs font-medium text-slate-400">Provider</span>
+                  <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Provider</span>
                   <select
                     x-model="session.settings.providerId"
                     @change="onProviderChange()"
-                    class="w-full rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                    class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   >
                     <option value="" disabled>Select…</option>
                     <template x-for="p in providers" :key="p.id">
@@ -89,11 +102,11 @@
                   </select>
                 </label>
                 <label class="block">
-                  <span class="mb-1 block text-xs font-medium text-slate-400">Target model</span>
+                  <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Target model</span>
                   <select
                     x-model="session.settings.modelId"
                     @change="persist()"
-                    class="w-full rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                    class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   >
                     <option value="" disabled>Select…</option>
                     <template x-for="m in activeModels" :key="m.id">
@@ -102,14 +115,14 @@
                   </select>
                 </label>
                 <label class="block">
-                  <span class="mb-1 block text-xs font-medium text-slate-400">Output language</span>
+                  <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Output language</span>
                   <input
                     type="text"
                     x-model="session.settings.outputLanguage"
                     @change="persist()"
                     list="languages"
                     placeholder="English"
-                    class="w-full rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1.5 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                    class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   />
                   <datalist id="languages">
                     <option>English</option><option>Persian</option><option>German</option>
@@ -118,7 +131,7 @@
                   </datalist>
                 </label>
               </div>
-              <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-300">
+              <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600 dark:text-slate-300">
                 <label class="flex cursor-pointer items-center gap-1.5">
                   <input type="checkbox" x-model="session.settings.options.clarity" @change="persist()" class="accent-indigo-500" /> Clarity
                 </label>
@@ -139,17 +152,17 @@
           </div>
 
           <!-- Draft textarea -->
-          <div class="flex min-h-0 flex-1 flex-col rounded-2xl border border-slate-800 bg-slate-900/50">
-            <div class="border-b border-slate-800 px-4 py-2.5 text-sm font-semibold text-white">Your prompt</div>
+          <div class="flex min-h-0 flex-1 flex-col rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
+            <div class="border-b border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-900 dark:border-slate-800 dark:text-white">Your prompt</div>
             <textarea
               x-model="session.draft"
               @input="touch()"
               placeholder="Write or paste the prompt you want to enhance — any language works."
-              class="min-h-0 flex-1 resize-none bg-transparent p-4 text-sm leading-relaxed text-slate-100 placeholder:text-slate-600 focus:outline-none"
+              class="min-h-0 flex-1 resize-none bg-transparent p-4 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-100 dark:placeholder:text-slate-600"
             ></textarea>
           </div>
 
-          <p x-show="error" x-cloak class="rounded-xl bg-rose-500/10 px-4 py-2.5 text-sm text-rose-300" x-text="error"></p>
+          <p x-show="error" x-cloak class="rounded-xl bg-rose-500/10 px-4 py-2.5 text-sm text-rose-700 dark:text-rose-300" x-text="error"></p>
 
           <button
             @click="enhance()"
@@ -165,12 +178,12 @@
         </section>
 
         <!-- Right: enhanced versions -->
-        <section class="flex min-h-0 flex-col rounded-2xl border border-slate-800 bg-slate-900/50">
-          <div class="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
-            <h2 class="text-sm font-semibold text-white">Enhanced prompt</h2>
+        <section class="flex min-h-0 flex-col rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
+          <div class="flex items-center justify-between border-b border-slate-200 px-4 py-2.5 dark:border-slate-800">
+            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Enhanced prompt</h2>
             <span
               x-show="session.versions.length > 0"
-              class="rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-xs font-medium text-indigo-300"
+              class="rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-xs font-medium text-indigo-600 dark:text-indigo-300"
               x-text="`v${versionIndex + 1} of ${session.versions.length}`"
             ></span>
           </div>
@@ -195,7 +208,7 @@
                       <textarea
                         x-model="v.text"
                         @input="touchVersion()"
-                        class="min-h-0 flex-1 resize-none rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm leading-relaxed text-slate-100 focus:border-indigo-500 focus:outline-none"
+                        class="min-h-0 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100"
                       ></textarea>
                     </div>
                   </template>
@@ -203,29 +216,29 @@
               </div>
 
               <!-- Version navigation + actions -->
-              <div class="flex items-center justify-between gap-2 border-t border-slate-800 p-3">
+              <div class="flex items-center justify-between gap-2 border-t border-slate-200 p-3 dark:border-slate-800">
                 <div class="flex items-center gap-1.5">
                   <button
                     @click="prevVersion()"
                     :disabled="versionIndex === 0"
                     title="Previous version"
-                    class="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+                    class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                   >←</button>
                   <button
                     @click="nextVersion()"
                     :disabled="versionIndex >= session.versions.length - 1"
                     title="Next version"
-                    class="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-30"
+                    class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                   >→</button>
                 </div>
                 <div class="flex items-center gap-1.5">
                   <button
                     @click="copyVersion()"
-                    class="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-slate-800"
+                    class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                   >Copy</button>
                   <button
                     @click="useVersionAsDraft()"
-                    class="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-slate-800"
+                    class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                   >Use as draft</button>
                   <button
                     @click="enhanceCurrentVersion()"
@@ -240,7 +253,7 @@
       </main>
 
       <!-- Footer -->
-      <footer class="border-t border-slate-800 px-6 py-2.5 text-center text-xs text-slate-500">
+      <footer class="border-t border-slate-200 px-6 py-2.5 text-center text-xs text-slate-500 dark:border-slate-800">
         Prompt Enhancer — runs entirely in your browser · all data stays in local storage
       </footer>
     </div>

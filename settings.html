@@ -5,28 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Settings — Prompt Enhancer</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>" />
+    <script>
+      // Apply the saved theme before first paint to avoid a flash
+      const saved = localStorage.getItem('pe.theme')
+      if (saved === 'dark' || (!saved && matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark')
+      }
+    </script>
     <link rel="stylesheet" href="/src/style.css" />
     <script type="module" src="/src/settings-page.ts"></script>
   </head>
-  <body class="h-full bg-slate-950 text-slate-200 antialiased">
+  <body class="h-full bg-slate-100 text-slate-700 antialiased dark:bg-slate-950 dark:text-slate-200">
     <div x-data="settingsApp" x-cloak class="flex min-h-full flex-col">
       <!-- Header -->
-      <header class="flex items-center justify-between border-b border-slate-800 bg-slate-900/70 px-6 py-3 backdrop-blur">
+      <header class="flex items-center justify-between border-b border-slate-200 bg-white/70 px-6 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
         <a href="/" class="flex items-center gap-2.5">
           <span class="grid size-8 place-items-center rounded-lg bg-indigo-500/20 text-lg">✨</span>
-          <span class="text-base font-semibold tracking-tight text-white">Prompt Enhancer</span>
+          <span class="text-base font-semibold tracking-tight text-slate-900 dark:text-white">Prompt Enhancer</span>
         </a>
         <nav class="flex items-center gap-1 text-sm">
-          <a href="/" class="rounded-lg px-3 py-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-white">Enhance</a>
-          <a href="/settings.html" class="rounded-lg bg-slate-800 px-3 py-1.5 font-medium text-white">Settings</a>
+          <a href="/" class="rounded-lg px-3 py-1.5 text-slate-500 transition hover:bg-slate-200 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">Enhance</a>
+          <a href="/settings.html" class="rounded-lg bg-slate-200 px-3 py-1.5 font-medium text-slate-900 dark:bg-slate-800 dark:text-white">Settings</a>
+          <button
+            @click="toggleTheme()"
+            :title="theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
+            class="ml-1 rounded-lg px-2.5 py-1.5 text-slate-500 transition hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800"
+            x-text="theme === 'dark' ? '☀️' : '🌙'"
+          ></button>
         </nav>
       </header>
 
       <main class="mx-auto w-full max-w-4xl flex-1 space-y-4 p-6">
         <div class="flex items-center justify-between">
           <div>
-            <h1 class="text-lg font-semibold text-white">LLM providers</h1>
-            <p class="mt-0.5 text-sm text-slate-400">
+            <h1 class="text-lg font-semibold text-slate-900 dark:text-white">LLM providers</h1>
+            <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
               Add any OpenAI-compatible provider. Keys are stored only in your browser.
             </p>
           </div>
@@ -37,41 +50,41 @@
         </div>
 
         <template x-if="providers.length === 0">
-          <div class="rounded-2xl border border-dashed border-slate-700 p-10 text-center text-sm text-slate-500">
+          <div class="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500 dark:border-slate-700">
             No providers yet. Add one to start enhancing prompts —
             e.g. OpenAI, OpenRouter, Groq, Together, or a local server like Ollama / LM Studio.
           </div>
         </template>
 
         <template x-for="provider in providers" :key="provider.id">
-          <section class="rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
+          <section class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/50">
             <!-- Provider fields -->
             <div class="grid grid-cols-2 gap-3">
               <label class="block">
-                <span class="mb-1 block text-xs font-medium text-slate-400">Name</span>
+                <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Name</span>
                 <input
                   type="text" x-model="provider.name" @change="persist()" placeholder="OpenAI"
-                  class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                  class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 />
               </label>
               <label class="block">
-                <span class="mb-1 block text-xs font-medium text-slate-400">Base URL (OpenAI-compatible)</span>
+                <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Base URL (OpenAI-compatible)</span>
                 <input
                   type="text" x-model="provider.baseUrl" @change="persist()" placeholder="https://api.openai.com/v1"
-                  class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                  class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 />
               </label>
               <label class="col-span-2 block">
-                <span class="mb-1 block text-xs font-medium text-slate-400">API key</span>
+                <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">API key</span>
                 <div class="flex gap-2">
                   <input
                     :type="revealedKeys[provider.id] ? 'text' : 'password'"
                     x-model="provider.apiKey" @change="persist()" placeholder="sk-…"
-                    class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:border-indigo-500 focus:outline-none"
+                    class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   />
                   <button
                     @click="revealedKeys[provider.id] = !revealedKeys[provider.id]"
-                    class="shrink-0 rounded-lg border border-slate-700 px-3 text-xs text-slate-300 transition hover:bg-slate-800"
+                    class="shrink-0 rounded-lg border border-slate-300 px-3 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                     x-text="revealedKeys[provider.id] ? 'Hide' : 'Show'"
                   ></button>
                 </div>
@@ -83,30 +96,30 @@
               <button
                 @click="runProviderTest(provider)"
                 :disabled="testState(provider.id).status === 'running'"
-                class="rounded-lg bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-600 disabled:opacity-50"
+                class="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-800 transition hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
               >Test provider</button>
               <span
                 class="text-xs"
                 :class="{
-                  'text-emerald-400': testState(provider.id).status === 'ok',
-                  'text-rose-400': testState(provider.id).status === 'error',
-                  'text-slate-400': testState(provider.id).status === 'running',
+                  'text-emerald-600 dark:text-emerald-400': testState(provider.id).status === 'ok',
+                  'text-rose-600 dark:text-rose-400': testState(provider.id).status === 'error',
+                  'text-slate-500 dark:text-slate-400': testState(provider.id).status === 'running',
                 }"
                 x-text="testState(provider.id).message"
               ></span>
               <button
                 @click="removeProvider(provider.id)"
-                class="ml-auto rounded-lg px-3 py-1.5 text-xs text-rose-400 transition hover:bg-rose-500/10"
+                class="ml-auto rounded-lg px-3 py-1.5 text-xs text-rose-600 transition hover:bg-rose-500/10 dark:text-rose-400"
               >Remove provider</button>
             </div>
 
             <!-- Models -->
-            <div class="mt-4 border-t border-slate-800 pt-4">
+            <div class="mt-4 border-t border-slate-200 pt-4 dark:border-slate-800">
               <div class="mb-2 flex items-center justify-between">
-                <h3 class="text-sm font-medium text-white">Models</h3>
+                <h3 class="text-sm font-medium text-slate-900 dark:text-white">Models</h3>
                 <button
                   @click="addModel(provider)"
-                  class="rounded-lg border border-slate-700 px-2.5 py-1 text-xs text-slate-300 transition hover:bg-slate-800"
+                  class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
                 >+ Add model</button>
               </div>
               <p x-show="provider.models.length === 0" class="text-xs text-slate-500">
@@ -114,33 +127,33 @@
               </p>
               <ul class="space-y-2">
                 <template x-for="model in provider.models" :key="model.id">
-                  <li class="flex flex-wrap items-center gap-2 rounded-xl bg-slate-800/60 p-2.5">
+                  <li class="flex flex-wrap items-center gap-2 rounded-xl bg-slate-100 p-2.5 dark:bg-slate-800/60">
                     <input
                       type="text" x-model="model.modelId" @change="persist()" placeholder="Model ID, e.g. gpt-4o-mini"
-                      class="w-56 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                      class="w-56 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                     />
                     <input
                       type="text" x-model="model.label" @change="persist()" placeholder="Display name (optional)"
-                      class="w-44 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                      class="w-44 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                     />
                     <button
                       @click="runModelTest(provider, model.id)"
                       :disabled="!model.modelId || testState(`${provider.id}:${model.id}`).status === 'running'"
-                      class="rounded-lg bg-slate-700 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-600 disabled:opacity-50"
+                      class="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-800 transition hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
                     >Test</button>
                     <span
                       class="min-w-0 flex-1 truncate text-xs"
                       :title="testState(`${provider.id}:${model.id}`).message"
                       :class="{
-                        'text-emerald-400': testState(`${provider.id}:${model.id}`).status === 'ok',
-                        'text-rose-400': testState(`${provider.id}:${model.id}`).status === 'error',
-                        'text-slate-400': testState(`${provider.id}:${model.id}`).status === 'running',
+                        'text-emerald-600 dark:text-emerald-400': testState(`${provider.id}:${model.id}`).status === 'ok',
+                        'text-rose-600 dark:text-rose-400': testState(`${provider.id}:${model.id}`).status === 'error',
+                        'text-slate-500 dark:text-slate-400': testState(`${provider.id}:${model.id}`).status === 'running',
                       }"
                       x-text="testState(`${provider.id}:${model.id}`).message"
                     ></span>
                     <button
                       @click="removeModel(provider, model.id)"
-                      class="rounded-lg px-2 py-1.5 text-xs text-rose-400 transition hover:bg-rose-500/10"
+                      class="rounded-lg px-2 py-1.5 text-xs text-rose-600 transition hover:bg-rose-500/10 dark:text-rose-400"
                     >✕</button>
                   </li>
                 </template>
@@ -156,7 +169,7 @@
       </main>
 
       <!-- Footer -->
-      <footer class="border-t border-slate-800 px-6 py-2.5 text-center text-xs text-slate-500">
+      <footer class="border-t border-slate-200 px-6 py-2.5 text-center text-xs text-slate-500 dark:border-slate-800">
         Prompt Enhancer — runs entirely in your browser · all data stays in local storage
       </footer>
     </div>

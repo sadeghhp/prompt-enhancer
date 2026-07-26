@@ -1,6 +1,7 @@
 import Alpine from 'alpinejs'
 import { enhancePrompt } from './api'
 import { storage } from './storage'
+import { applyTheme, loadTheme, saveTheme } from './theme'
 import { DEFAULT_OPTIONS, uid } from './types'
 import type { Provider, Session, SessionSettings } from './types'
 
@@ -35,6 +36,13 @@ Alpine.data('mainApp', () => ({
   enhancing: false,
   error: '',
   showAdvanced: true,
+  theme: loadTheme(),
+
+  toggleTheme() {
+    this.theme = this.theme === 'dark' ? 'light' : 'dark'
+    applyTheme(this.theme)
+    saveTheme(this.theme)
+  },
 
   init() {
     this.providers = storage.loadProviders()

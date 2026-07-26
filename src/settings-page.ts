@@ -1,6 +1,7 @@
 import Alpine from 'alpinejs'
 import { testModel, testProvider } from './api'
 import { storage } from './storage'
+import { applyTheme, loadTheme, saveTheme } from './theme'
 import { uid } from './types'
 import type { Provider } from './types'
 
@@ -14,6 +15,13 @@ Alpine.data('settingsApp', () => ({
   /** Test state keyed by provider id or `${providerId}:${modelId}` */
   tests: {} as Record<string, TestState>,
   revealedKeys: {} as Record<string, boolean>,
+  theme: loadTheme(),
+
+  toggleTheme() {
+    this.theme = this.theme === 'dark' ? 'light' : 'dark'
+    applyTheme(this.theme)
+    saveTheme(this.theme)
+  },
 
   init() {
     this.providers = storage.loadProviders()

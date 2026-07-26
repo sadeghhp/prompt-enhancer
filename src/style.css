@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* Dark mode is toggled via the `dark` class on <html>, not the OS setting */
+@custom-variant dark (&:where(.dark, .dark *));
+
 [x-cloak] {
   display: none !important;
 }

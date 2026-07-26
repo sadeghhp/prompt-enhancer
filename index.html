@@ -70,7 +70,7 @@
         </aside>
 
         <!-- Right: enhancement chain — every column is one link with its own settings -->
-        <section class="flex min-h-0 flex-col">
+        <section class="flex min-h-0 min-w-0 flex-col">
           <template x-if="providers.length === 0">
             <p class="mb-3 rounded-(--radius-sm) bg-(--warning-soft) px-3 py-2 text-xs text-(--warning)">
               No providers configured yet —
@@ -78,17 +78,16 @@
             </p>
           </template>
 
-          <!-- Two-column sliding viewport -->
-          <div class="min-h-0 flex-1 overflow-hidden">
+          <!-- Sliding chain viewport: all horizontal motion happens in here -->
+          <div class="min-h-0 min-w-0 flex-1 overflow-clip">
             <div class="chain-track h-full" :style="`--view-index: ${session.viewIndex}`">
               <template x-for="(col, i) in session.chain" :key="col.id">
                 <div
-                  class="chain-card flex h-full flex-col gap-3 px-1.5"
-                  :data-hidden="i < session.viewIndex || i > session.viewIndex + 1"
+                  class="chain-card @container flex h-full flex-col gap-2.5 px-1.5"
                   :data-past="i < session.viewIndex"
                 >
                   <!-- Column header: version badge + lineage + actions -->
-                  <div class="card flex items-center gap-3 px-4 py-2.5">
+                  <div class="card flex items-center gap-2.5 px-3 py-2">
                     <span class="version-badge shrink-0" :title="`Version ${i + 1} in the enhancement chain`">
                       <span class="version-prefix">v</span><span x-text="i + 1"></span>
                     </span>
@@ -108,21 +107,22 @@
                     </span>
                   </div>
 
-                  <!-- Advanced settings (independent per column) -->
+                  <!-- Advanced settings (independent per column) — high-density:
+                       container-query grids tighten to the column's own width -->
                   <div class="card">
-                    <button @click="col.showAdvanced = !col.showAdvanced; persist()" class="flex w-full items-center justify-between px-4 py-2.5">
+                    <button @click="col.showAdvanced = !col.showAdvanced; persist()" class="flex w-full items-center justify-between px-3 py-2">
                       <span class="text-sm font-semibold text-(--text-primary)">Advanced settings</span>
                       <span class="text-xs text-(--text-muted)" x-text="col.showAdvanced ? '▲' : '▼'"></span>
                     </button>
-                    <div x-show="col.showAdvanced" class="space-y-3 border-t border-(--border-default) px-4 py-3">
-                      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div x-show="col.showAdvanced" class="space-y-2.5 border-t border-(--border-default) px-3 py-2.5">
+                      <div class="grid grid-cols-2 gap-2 @lg:grid-cols-3">
                         <label class="block">
                           <span class="field-label">Enhancer provider</span>
                           <select
                             x-model="col.settings.providerId"
                             x-effect="$nextTick(() => { $el.value = col.settings.providerId })"
                             @change="onProviderChange(col)"
-                            class="field"
+                            class="field field-xs"
                           >
                             <option value="" disabled>Select…</option>
                             <template x-for="p in providers" :key="p.id">
@@ -136,7 +136,7 @@
                             x-model="col.settings.modelId"
                             x-effect="$nextTick(() => { $el.value = col.settings.modelId })"
                             @change="persist()"
-                            class="field"
+                            class="field field-xs"
                           >
                             <option value="" disabled>Select…</option>
                             <template x-for="m in modelsFor(col)" :key="m.id">
@@ -144,7 +144,7 @@
                             </template>
                           </select>
                         </label>
-                        <label class="block">
+                        <label class="col-span-2 block @lg:col-span-1">
                           <span class="field-label">Output language</span>
                           <input
                             type="text"
@@ -152,11 +152,11 @@
                             @change="persist()"
                             list="languages"
                             placeholder="English"
-                            class="field"
+                            class="field field-xs"
                           />
                         </label>
                       </div>
-                      <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-(--text-secondary)">
+                      <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-(--text-secondary) @lg:grid-cols-3">
                         <label class="flex cursor-pointer items-center gap-1.5">
                           <input type="checkbox" x-model="col.settings.options.clarity" @change="persist()" class="checkbox" /> Clarity
                         </label>
@@ -175,12 +175,12 @@
                       </div>
 
                       <!-- Target optimization: what the enhanced prompt is FOR (not the enhancer) -->
-                      <div class="card-inset p-3">
-                        <div class="mb-2 flex flex-wrap items-baseline justify-between gap-x-2">
+                      <div class="card-inset p-2.5">
+                        <div class="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-2">
                           <span class="text-xs font-semibold text-(--text-secondary)">Target optimization <span class="font-normal text-(--text-faint)">(optional)</span></span>
-                          <span class="text-[11px] text-(--text-faint)">where the enhanced prompt will be used</span>
+                          <span class="hidden text-[11px] text-(--text-faint) @lg:inline">where the enhanced prompt will be used</span>
                         </div>
-                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div class="grid grid-cols-2 gap-2 @lg:grid-cols-3">
                           <label class="block">
                             <span class="field-label">Target platform</span>
                             <input
@@ -189,7 +189,7 @@
                               @change="persist()"
                               list="target-platforms"
                               placeholder="e.g. Claude Code"
-                              class="field"
+                              class="field field-xs"
                             />
                           </label>
                           <label class="block">
@@ -199,10 +199,10 @@
                               x-model="col.settings.target.model"
                               @change="persist()"
                               placeholder="e.g. claude-sonnet-5"
-                              class="field"
+                              class="field field-xs"
                             />
                           </label>
-                          <label class="block">
+                          <label class="col-span-2 block @lg:col-span-1">
                             <span class="field-label">Target type</span>
                             <input
                               type="text"
@@ -210,11 +210,11 @@
                               @change="persist()"
                               list="target-types"
                               placeholder="e.g. Coding agent"
-                              class="field"
+                              class="field field-xs"
                             />
                           </label>
                         </div>
-                        <div class="mt-2.5">
+                        <div class="mt-2">
                           <span class="field-label">Best-practice collections</span>
                           <template x-if="bestPractices.length === 0">
                             <p class="text-xs text-(--text-faint)">
@@ -222,7 +222,7 @@
                               <a href="./settings.html" class="underline hover:text-(--text-secondary)">Settings</a>.
                             </p>
                           </template>
-                          <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-(--text-secondary)">
+                          <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-(--text-secondary)">
                             <template x-for="bp in bestPractices" :key="bp.id">
                               <label class="flex cursor-pointer items-center gap-1.5" :title="bp.target ? `For ${bp.target}` : ''">
                                 <input
@@ -271,42 +271,44 @@
 
                   <!-- Editable prompt text -->
                   <div class="chain-editor card flex min-h-0 flex-1 flex-col">
-                    <div class="border-b border-(--border-default) px-4 py-2.5 text-sm font-semibold text-(--text-primary)" x-text="i === 0 ? 'Your prompt' : 'Enhanced prompt'"></div>
+                    <div class="border-b border-(--border-default) px-3 py-2 text-sm font-semibold text-(--text-primary)" x-text="i === 0 ? 'Your prompt' : 'Enhanced prompt'"></div>
                     <textarea
                       x-model="col.text"
                       @input="touch()"
                       :placeholder="i === 0 ? 'Write or paste the prompt you want to enhance — any language works.' : 'The enhanced prompt appears here — edit it freely before the next enhancement.'"
-                      class="min-h-0 flex-1 resize-none bg-transparent p-4 text-sm leading-relaxed text-(--text-primary) placeholder:text-(--text-faint) focus:outline-none"
+                      class="min-h-0 flex-1 resize-none bg-transparent p-3 text-sm leading-relaxed text-(--text-primary) placeholder:text-(--text-faint) focus:outline-none"
                     ></textarea>
                   </div>
 
                   <!-- Enhancement instruction (independent per column) -->
                   <div class="card">
-                    <div class="flex flex-wrap items-baseline justify-between gap-x-2 border-b border-(--border-default) px-4 py-2">
+                    <div class="flex flex-wrap items-baseline justify-between gap-x-2 border-b border-(--border-default) px-3 py-1.5">
                       <span class="text-sm font-semibold text-(--text-primary)">Instruction <span class="font-normal text-(--text-faint)">(optional)</span></span>
-                      <span class="text-xs text-(--text-muted)">guides this column's enhancement</span>
+                      <span class="hidden text-xs text-(--text-muted) @lg:inline">guides this column's enhancement</span>
                     </div>
                     <textarea
                       x-model="col.instruction"
                       @input="persist()"
                       rows="2"
                       placeholder="e.g. Make it more formal · Turn it into a step-by-step task"
-                      class="w-full resize-none bg-transparent px-4 py-3 text-sm leading-relaxed text-(--text-primary) placeholder:text-(--text-faint) focus:outline-none"
+                      class="w-full resize-none bg-transparent px-3 py-2 text-sm leading-relaxed text-(--text-primary) placeholder:text-(--text-faint) focus:outline-none"
                     ></textarea>
                   </div>
 
                   <!-- Enhance: generates the next link in the chain -->
-                  <button
-                    @click="enhanceFrom(i)"
-                    :disabled="!canEnhance(col)"
-                    class="btn btn-primary rounded-(--radius-md) px-4 py-3"
-                  >
-                    <span x-show="!enhancing" x-text="`✨ Enhance → v${i + 2}`"></span>
-                    <span x-show="enhancing" x-cloak class="flex items-center gap-2">
-                      <span class="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
-                      Enhancing…
-                    </span>
-                  </button>
+                  <div class="flex justify-end">
+                    <button
+                      @click="enhanceFrom(i)"
+                      :disabled="!canEnhance(col)"
+                      class="btn btn-primary w-1/3 rounded-(--radius-md) px-3 py-2.5"
+                    >
+                      <span x-show="!enhancing" class="truncate" x-text="`✨ Enhance → v${i + 2}`"></span>
+                      <span x-show="enhancing" x-cloak class="flex items-center gap-2">
+                        <span class="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
+                        Enhancing…
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </template>
             </div>
@@ -319,19 +321,19 @@
             <button
               @click="prevView()"
               :disabled="session.viewIndex === 0"
-              title="Earlier links in the chain"
+              title="Earlier links in the chain (←)"
               class="btn btn-outline px-4 py-1.5"
             >←</button>
             <span
               class="text-xs text-(--text-muted) tabular-nums"
               x-text="session.chain.length === 1
                 ? '1 link in chain'
-                : `Showing v${session.viewIndex + 1}–v${Math.min(session.viewIndex + 2, session.chain.length)} of ${session.chain.length} links`"
+                : `Showing from v${session.viewIndex + 1} of ${session.chain.length} links`"
             ></span>
             <button
               @click="nextView()"
               :disabled="session.viewIndex >= maxViewIndex"
-              title="Later links in the chain"
+              title="Later links in the chain (→)"
               class="btn btn-outline px-4 py-1.5"
             >→</button>
           </div>

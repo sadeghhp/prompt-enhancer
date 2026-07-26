@@ -148,6 +148,24 @@ Alpine.data('mainApp', () => ({
         ? savedActive
         : this.sessions[0].id
     this.persist()
+    // ← / → slide the chain viewport — unless the user is typing in a field
+    // or using a browser shortcut (Alt+← = back).
+    window.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      if (e.altKey || e.ctrlKey || e.metaKey) return
+      const el = e.target as HTMLElement | null
+      if (
+        el &&
+        (el.tagName === 'INPUT' ||
+          el.tagName === 'TEXTAREA' ||
+          el.tagName === 'SELECT' ||
+          el.isContentEditable)
+      )
+        return
+      e.preventDefault()
+      if (e.key === 'ArrowLeft') this.prevView()
+      else this.nextView()
+    })
   },
 
   get session(): Session {

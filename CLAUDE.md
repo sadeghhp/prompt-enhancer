@@ -106,21 +106,30 @@ number = the column's 1-based position in the chain. Rules:
   written by you"; column *i* reads "Enhanced from v*i* / by {provider/model}".
 - Version numbers appear consistently everywhere the chain is referenced:
   the Enhance button ("Enhance → v{next}") and the nav counter
-  ("Showing v1–v2 of N links").
+  ("Showing from v{n} of N links").
 
 ### Responsive layout
 
+- `html`/`body` are `overflow-x: clip` — the page never scrolls
+  horizontally. All horizontal motion happens inside the chain viewport
+  (`overflow-clip`, `min-w-0`) via transform, so the header never shifts.
 - Desktop (`md:`+): `[16rem_1fr]` grid — sessions sidebar + chain viewport.
   Below `md`, single column; the sidebar caps at `max-h-48` and scrolls.
 - Chain: `.chain-track` slides horizontally by `--view-index` (set inline by
-  Alpine) × `--chain-step`. Desktop `--chain-step: 50%` (two columns
-  visible); below `lg` it is `94%` (one column + a peek of the next). Change
-  step sizes in CSS only — the JS never encodes widths.
-- Below `lg`, `.chain-card` scrolls vertically (`overflow-y: auto`, children
-  `flex-shrink: 0`, editor min-height via `.chain-editor`) so no control is
-  ever clipped.
-- Form grids collapse: `grid-cols-1 sm:grid-cols-2/3`. Nothing may overflow
-  the viewport horizontally except the chain track itself.
+  Alpine) × `--chain-step`. Desktop `--chain-step: 33.333%` (three columns
+  visible, so later links' Copy buttons stay reachable); below `lg` it is
+  `94%` (one column + a peek of the next). Change step sizes in CSS only —
+  the JS never encodes widths. `←`/`→` arrow keys also slide the chain
+  (listener in `main.ts`, skipped while typing in a field).
+- `.chain-card` scrolls vertically at every width (`overflow-y: auto`,
+  children `flex-shrink: 0`, editor min-height via `.chain-editor`) so no
+  control is ever clipped and the page itself needs no vertical scrolling.
+- Each `.chain-card` is an `@container`: per-column form grids use container
+  variants (`grid-cols-2 @lg:grid-cols-3`) so density tracks the column's
+  own width, not the viewport. Advanced settings use `.field-xs` fields.
+- The per-column Enhance button is `w-1/3`, right-aligned in its column.
+- Nothing may overflow the viewport horizontally except the chain track
+  itself.
 
 ## Conventions
 

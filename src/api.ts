@@ -154,6 +154,7 @@ function buildSystemPrompt(ctx: EnhanceContext): string {
   if (options.bestPractices) goals.push('Apply prompt-engineering best practices: explicit instructions, concrete constraints, and a clearly specified output format.')
   if (options.tokenEfficiency) goals.push('Be concise — cut filler and redundancy to reduce token usage without losing meaning or quality.')
   if (options.preserveIntent) goals.push('Preserve the original intent, requirements, and all factual details exactly.')
+  if (options.brevity) goals.push('Rewrite for brevity, efficiency, and clarity: use the fewest words and tokens that fully express the prompt, cutting every redundancy — while keeping its quality, specificity, and instructional strength fully intact.')
 
   const lines = [
     'You are an expert prompt engineer. Rewrite the prompt the user gives you into a higher-quality prompt for an LLM or AI agent.',

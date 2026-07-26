@@ -90,6 +90,8 @@ export interface EnhanceOptions {
   bestPractices: boolean
   tokenEfficiency: boolean
   preserveIntent: boolean
+  /** Force a tight rewrite: brevity, efficiency, and clarity, without weakening the prompt */
+  brevity: boolean
 }
 
 export interface ColumnSettings {
@@ -137,6 +139,12 @@ export interface Session {
   chain: PromptColumn[]
   /** Index of the leftmost column in the two-column viewport */
   viewIndex: number
+  /** Marked as a favorite; shown with an accent star, does not affect order */
+  starred?: boolean
+  /** Kept at the top of the session list regardless of recency */
+  pinned?: boolean
+  /** Hidden from the main list, tucked into the collapsible Archived section */
+  archived?: boolean
   /* Legacy fields from the pre-chain data model; migrated on load */
   draft?: string
   instruction?: string
@@ -150,6 +158,7 @@ export const DEFAULT_OPTIONS: EnhanceOptions = {
   bestPractices: true,
   tokenEfficiency: true,
   preserveIntent: true,
+  brevity: false,
 }
 
 export function uid(): string {

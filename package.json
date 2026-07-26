@@ -10,7 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "alpinejs": "^3.14.9"
+    "alpinejs": "^3.14.9",
+    "dompurify": "^3.4.12",
+    "marked": "^18.0.7"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.11",

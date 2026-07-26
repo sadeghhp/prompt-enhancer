@@ -35,8 +35,10 @@
         </nav>
       </header>
 
-      <!-- Main: sessions sidebar + enhancement chain -->
-      <main class="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-[16rem_1fr]">
+      <!-- Main: sessions sidebar + enhancement chain + Markdown preview.
+           The preview is a full-width strip below the chain on md, and the
+           fourth column (its own grid track) on xl and up. -->
+      <main class="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-[16rem_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)_auto] xl:grid-cols-[16rem_minmax(0,1fr)_22rem] xl:grid-rows-1">
         <!-- Left: sessions -->
         <aside class="card flex min-h-0 max-h-48 flex-col md:max-h-none">
           <div class="flex items-center justify-between border-b border-(--border-default) px-4 py-3">
@@ -44,29 +46,121 @@
             <button @click="createSession()" class="btn btn-primary btn-xs">+ New</button>
           </div>
           <ul class="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
-            <template x-for="s in sortedSessions" :key="s.id">
+            <template x-for="s in visibleSessions" :key="s.id">
               <li>
-                <button
-                  @click="openSession(s.id)"
-                  class="group flex w-full items-start justify-between gap-2 rounded-(--radius-md) px-3 py-2 text-left transition"
+                <div
+                  class="group flex w-full items-start justify-between gap-2 rounded-(--radius-md) px-3 py-2 transition"
                   :class="s.id === activeId ? 'bg-(--accent-soft) ring-1 ring-(--accent-ring)' : 'hover:bg-(--surface-hover)'"
                 >
-                  <span class="min-w-0">
-                    <span class="block truncate text-sm" :class="s.id === activeId ? 'font-medium text-(--text-primary)' : 'text-(--text-secondary)'" x-text="s.title"></span>
-                    <span class="mt-0.5 block text-xs text-(--text-muted)">
-                      <span x-text="formatDate(s.updatedAt)"></span>
-                      · <span x-text="s.chain.length"></span> links
+                  <button @click="openSession(s.id)" class="flex min-w-0 flex-1 items-start gap-1.5 text-left">
+                    <span class="min-w-0">
+                      <span class="block truncate text-sm" :class="s.id === activeId ? 'font-medium text-(--text-primary)' : 'text-(--text-secondary)'" x-text="s.title"></span>
+                      <span class="mt-0.5 block text-xs text-(--text-muted)">
+                        <span x-text="formatDate(s.updatedAt)"></span>
+                        · <span x-text="s.chain.length"></span> links
+                      </span>
                     </span>
+                  </button>
+                  <span class="mt-0.5 flex shrink-0 items-center gap-1.5">
+                    <!-- Star: persistent accent marker when set, revealed on hover otherwise -->
+                    <span
+                      role="button"
+                      @click.stop="toggleStar(s.id)"
+                      :aria-label="s.starred ? 'Unstar session' : 'Star session'"
+                      :title="s.starred ? 'Unstar' : 'Star'"
+                      class="cursor-pointer transition"
+                      :class="s.starred ? 'text-(--accent-text)' : 'text-(--text-muted) opacity-0 group-hover:opacity-100 hover:text-(--text-secondary)'"
+                    >
+                      <svg viewBox="0 0 24 24" :fill="s.starred ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" class="h-3.5 w-3.5">
+                        <path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.2 6.1L12 17l-5.5 2.7 1.2-6.1L3.2 9.4l6.1-.8L12 3z" />
+                      </svg>
+                    </span>
+                    <!-- Pin: keeps the session at the top of the list -->
+                    <span
+                      role="button"
+                      @click.stop="togglePin(s.id)"
+                      :aria-label="s.pinned ? 'Unpin session' : 'Pin session'"
+                      :title="s.pinned ? 'Unpin' : 'Pin to top'"
+                      class="cursor-pointer transition"
+                      :class="s.pinned ? 'text-(--accent-text)' : 'text-(--text-muted) opacity-0 group-hover:opacity-100 hover:text-(--text-secondary)'"
+                    >
+                      <svg viewBox="0 0 24 24" :fill="s.pinned ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5">
+                        <path d="M12 21v-6" />
+                        <path d="M8 4h8l-1 5 2.5 2.5V13H6.5v-1.5L9 9 8 4z" />
+                      </svg>
+                    </span>
+                    <!-- Archive: tuck out of the main list -->
+                    <span
+                      role="button"
+                      @click.stop="toggleArchive(s.id)"
+                      aria-label="Archive session"
+                      title="Archive"
+                      class="cursor-pointer text-(--text-muted) opacity-0 transition group-hover:opacity-100 hover:text-(--text-secondary)"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5">
+                        <rect x="3" y="4" width="18" height="4" rx="1" />
+                        <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+                        <path d="M10 12h4" />
+                      </svg>
+                    </span>
+                    <span
+                      @click.stop="deleteSession(s.id)"
+                      aria-label="Delete session"
+                      title="Delete session"
+                      class="cursor-pointer text-(--text-muted) opacity-0 transition group-hover:opacity-100 hover:text-(--danger)"
+                    >✕</span>
                   </span>
-                  <span
-                    @click.stop="deleteSession(s.id)"
-                    title="Delete session"
-                    class="mt-0.5 hidden shrink-0 cursor-pointer text-(--text-muted) group-hover:block hover:text-(--danger)"
-                  >✕</span>
-                </button>
+                </div>
               </li>
             </template>
           </ul>
+
+          <!-- Archived sessions: collapsed by default, restore or delete only -->
+          <div x-show="archivedSessions.length > 0" x-cloak class="border-t border-(--border-default)">
+            <button
+              @click="showArchived = !showArchived"
+              class="flex w-full items-center justify-between px-4 py-2.5 text-xs text-(--text-muted) hover:text-(--text-secondary)"
+            >
+              <span>Archived · <span x-text="archivedSessions.length" class="tabular-nums"></span></span>
+              <span x-text="showArchived ? '▲' : '▼'"></span>
+            </button>
+            <ul x-show="showArchived" x-cloak class="max-h-40 space-y-1 overflow-y-auto px-2 pb-2">
+              <template x-for="s in archivedSessions" :key="s.id">
+                <li>
+                  <div class="group flex w-full items-start justify-between gap-2 rounded-(--radius-md) px-3 py-2 transition hover:bg-(--surface-hover)">
+                    <button @click="openSession(s.id)" class="min-w-0 flex-1 text-left">
+                      <span class="block truncate text-sm text-(--text-secondary)" x-text="s.title"></span>
+                      <span class="mt-0.5 block text-xs text-(--text-muted)">
+                        <span x-text="formatDate(s.updatedAt)"></span>
+                        · <span x-text="s.chain.length"></span> links
+                      </span>
+                    </button>
+                    <span class="mt-0.5 flex shrink-0 items-center gap-1.5">
+                      <span
+                        role="button"
+                        @click.stop="toggleArchive(s.id)"
+                        aria-label="Restore session"
+                        title="Restore"
+                        class="cursor-pointer text-(--text-muted) transition hover:text-(--text-secondary)"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5">
+                          <path d="M3 7v13a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V7" />
+                          <rect x="2" y="3" width="20" height="4" rx="1" />
+                          <path d="M12 17v-6" /><path d="M9 14l3-3 3 3" />
+                        </svg>
+                      </span>
+                      <span
+                        @click.stop="deleteSession(s.id)"
+                        aria-label="Delete session"
+                        title="Delete session"
+                        class="cursor-pointer text-(--text-muted) transition hover:text-(--danger)"
+                      >✕</span>
+                    </span>
+                  </div>
+                </li>
+              </template>
+            </ul>
+          </div>
         </aside>
 
         <!-- Right: enhancement chain — every column is one link with its own settings -->
@@ -83,11 +177,13 @@
             <div class="chain-track h-full" :style="`--view-index: ${session.viewIndex}`">
               <template x-for="(col, i) in session.chain" :key="col.id">
                 <div
+                  @click="selectPreview(col)"
                   class="chain-card @container flex h-full flex-col gap-2.5 px-1.5"
                   :data-past="i < session.viewIndex"
                 >
-                  <!-- Column header: version badge + lineage + actions -->
-                  <div class="card flex items-center gap-2.5 px-3 py-2">
+                  <!-- Column header: version badge + lineage + actions.
+                       The accent ring marks the column shown in the preview. -->
+                  <div class="card flex items-center gap-2.5 px-3 py-2" :class="previewColumn.id === col.id ? 'ring-1 ring-(--accent-ring)' : ''">
                     <span class="version-badge shrink-0" :title="`Version ${i + 1} in the enhancement chain`">
                       <span class="version-prefix">v</span><span x-text="i + 1"></span>
                     </span>
@@ -174,6 +270,9 @@
                         </label>
                         <label class="flex cursor-pointer items-center gap-1.5">
                           <input type="checkbox" x-model="col.settings.options.preserveIntent" @change="persist()" class="checkbox" /> Preserve intent
+                        </label>
+                        <label class="flex cursor-pointer items-center gap-1.5" title="Force a tight rewrite — brevity, efficiency, and clarity — without weakening the prompt">
+                          <input type="checkbox" x-model="col.settings.options.brevity" @change="persist()" class="checkbox" /> Brevity
                         </label>
                       </div>
 
@@ -353,6 +452,26 @@
             <option>Chinese</option><option>Japanese</option>
           </datalist>
         </section>
+
+        <!-- Fourth column: rendered Markdown of the selected chain link.
+             Click a column to preview it; defaults to the newest link. -->
+        <aside class="card flex max-h-56 min-h-0 flex-col md:col-span-2 md:max-h-64 xl:col-span-1 xl:col-start-3 xl:max-h-none">
+          <div class="flex items-baseline justify-between gap-2 border-b border-(--border-default) px-4 py-3">
+            <h2 class="text-sm font-semibold text-(--text-primary)">Markdown preview</h2>
+            <span class="text-xs text-(--text-muted)">
+              showing <span class="font-semibold text-(--accent-text) tabular-nums" x-text="`v${previewVersion}`"></span>
+            </span>
+          </div>
+          <template x-if="previewHtml">
+            <div class="markdown-body min-h-0 flex-1 overflow-y-auto p-4" x-html="previewHtml"></div>
+          </template>
+          <template x-if="!previewHtml">
+            <p class="p-4 text-xs text-(--text-faint)">
+              Nothing to preview yet — this link's prompt is empty. Click any
+              column in the chain to preview it here.
+            </p>
+          </template>
+        </aside>
       </main>
 
       <!-- Footer -->

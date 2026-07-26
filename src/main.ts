@@ -23,6 +23,7 @@ function newSession(providers: Provider[]): Session {
     createdAt: now,
     updatedAt: now,
     draft: '',
+    instruction: '',
     versions: [],
     settings: defaultSettings(providers),
   }
@@ -47,6 +48,8 @@ Alpine.data('mainApp', () => ({
   init() {
     this.providers = storage.loadProviders()
     this.sessions = storage.loadSessions()
+    // Sessions saved before the instruction feature existed lack the field
+    for (const s of this.sessions) s.instruction ??= ''
     if (this.sessions.length === 0) {
       this.sessions.push(newSession(this.providers))
     }
@@ -143,6 +146,24 @@ Alpine.data('mainApp', () => ({
 
     this.enhancing = true
     this.error = ''
+    // Create the version card up front and stream tokens into it so the
+    // response appears in real time.
+    session.versions.push({
+      id: uid(),
+      text: '',
+      createdAt: Date.now(),
+      model: `${provider.name} / ${model.label || model.modelId}`,
+    })
+    // Re-read through the session proxy so writes to `version.text` below are
+    // reactive — mutating the raw pushed object would not update the UI.
+    const version = session.versions[session.versions.length - 1]
+    // Let the new card render, then slide to it — unless the user has
+    // navigated to a different session in the meantime.
+    if (this.activeId === session.id) {
+      requestAnimationFrame(() => {
+        this.versionIndex = session.versions.length - 1
+      })
+    }
     try {
       const enhanced = await enhancePrompt(
         provider,
@@ -150,22 +171,19 @@ Alpine.data('mainApp', () => ({
         text,
         session.settings.options,
         session.settings.outputLanguage,
+        session.instruction,
+        (_chunk, fullText) => {
+          version.text = fullText
+        },
       )
-      session.versions.push({
-        id: uid(),
-        text: enhanced,
-        createdAt: Date.now(),
-        model: `${provider.name} / ${model.label || model.modelId}`,
-      })
+      version.text = enhanced
       this.touch(session)
-      // Let the new card render, then slide to it — unless the user has
-      // navigated to a different session in the meantime.
-      if (this.activeId === session.id) {
-        requestAnimationFrame(() => {
-          this.versionIndex = session.versions.length - 1
-        })
-      }
     } catch (err) {
+      // Drop the placeholder card so a failed request leaves no empty version.
+      session.versions = session.versions.filter((v) => v.id !== version.id)
+      if (this.activeId === session.id) {
+        this.versionIndex = Math.min(this.versionIndex, Math.max(0, session.versions.length - 1))
+      }
       this.error = err instanceof Error ? err.message : String(err)
     } finally {
       this.enhancing = false

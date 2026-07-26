@@ -59,7 +59,7 @@ export async function testModel(provider: Provider, modelId: string): Promise<Te
   }
 }
 
-function buildSystemPrompt(options: EnhanceOptions, outputLanguage: string): string {
+function buildSystemPrompt(options: EnhanceOptions, outputLanguage: string, instruction?: string): string {
   const goals: string[] = ['Fix grammar, spelling, and awkward phrasing.']
   if (options.clarity) goals.push('Maximize clarity and remove ambiguity.')
   if (options.structure) goals.push('Give the prompt a clean structure (role, task, context, constraints, output format) when it helps.')
@@ -67,12 +67,19 @@ function buildSystemPrompt(options: EnhanceOptions, outputLanguage: string): str
   if (options.tokenEfficiency) goals.push('Be concise — cut filler and redundancy to reduce token usage without losing meaning or quality.')
   if (options.preserveIntent) goals.push('Preserve the original intent, requirements, and all factual details exactly.')
 
-  return [
+  const lines = [
     'You are an expert prompt engineer. Rewrite the prompt the user gives you into a higher-quality prompt for an LLM or AI agent.',
     ...goals.map((g) => `- ${g}`),
     `Write the enhanced prompt in ${outputLanguage || 'English'}, regardless of the input language.`,
-    'Return ONLY the enhanced prompt text — no preamble, no explanations, no surrounding quotes or code fences.',
-  ].join('\n')
+  ]
+  if (instruction?.trim()) {
+    lines.push(
+      'The user also gave this instruction about how to enhance the prompt. It takes priority over the goals above — apply it faithfully, and treat it as guidance for the rewrite, NOT as content to answer or to insert verbatim:',
+      `"""${instruction.trim()}"""`,
+    )
+  }
+  lines.push('Return ONLY the enhanced prompt text — no preamble, no explanations, no surrounding quotes or code fences.')
+  return lines.join('\n')
 }
 
 export async function enhancePrompt(
@@ -81,14 +88,17 @@ export async function enhancePrompt(
   prompt: string,
   options: EnhanceOptions,
   outputLanguage: string,
+  instruction?: string,
+  onDelta?: (chunk: string, fullText: string) => void,
 ): Promise<string> {
   const res = await fetch(`${normalizeBaseUrl(provider.baseUrl)}/chat/completions`, {
     method: 'POST',
     headers: authHeaders(provider),
     body: JSON.stringify({
       model: modelId,
+      stream: true,
       messages: [
-        { role: 'system', content: buildSystemPrompt(options, outputLanguage) },
+        { role: 'system', content: buildSystemPrompt(options, outputLanguage, instruction) },
         { role: 'user', content: prompt },
       ],
     }),
@@ -96,12 +106,62 @@ export async function enhancePrompt(
   if (!res.ok) {
     throw new Error(`Provider error (HTTP ${res.status}): ${await safeError(res)}`)
   }
-  const data = await res.json()
-  const text: unknown = data?.choices?.[0]?.message?.content
-  if (typeof text !== 'string' || !text.trim()) {
+  const text = res.headers.get('content-type')?.includes('text/event-stream')
+    ? await readSseStream(res, onDelta)
+    : extractCompletionText(await res.json())
+  if (!text.trim()) {
     throw new Error('The model returned an empty response.')
   }
   return text.trim()
+}
+
+/** Some providers ignore `stream: true` and return plain JSON — handle both. */
+function extractCompletionText(data: unknown): string {
+  const text = (data as any)?.choices?.[0]?.message?.content
+  return typeof text === 'string' ? text : ''
+}
+
+async function readSseStream(
+  res: Response,
+  onDelta?: (chunk: string, fullText: string) => void,
+): Promise<string> {
+  if (!res.body) throw new Error('The provider response has no body to stream.')
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let fullText = ''
+
+  const handleLine = (line: string) => {
+    if (!line.startsWith('data:')) return
+    const payload = line.slice(5).trim()
+    if (!payload || payload === '[DONE]') return
+    let event: any
+    try {
+      event = JSON.parse(payload)
+    } catch {
+      return // ignore malformed keep-alive / partial frames
+    }
+    if (event?.error) {
+      throw new Error(event.error.message ?? 'The provider reported a streaming error.')
+    }
+    const chunk = event?.choices?.[0]?.delta?.content
+    if (typeof chunk === 'string' && chunk) {
+      fullText += chunk
+      onDelta?.(chunk, fullText)
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) handleLine(line.trim())
+  }
+  buffer += decoder.decode()
+  if (buffer.trim()) handleLine(buffer.trim())
+  return fullText
 }
 
 async function safeError(res: Response): Promise<string> {

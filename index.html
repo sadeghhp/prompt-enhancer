@@ -162,6 +162,21 @@
             ></textarea>
           </div>
 
+          <!-- Enhancement instruction -->
+          <div class="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
+            <div class="flex items-baseline justify-between border-b border-slate-200 px-4 py-2.5 dark:border-slate-800">
+              <span class="text-sm font-semibold text-slate-900 dark:text-white">Instruction <span class="font-normal text-slate-400 dark:text-slate-500">(optional)</span></span>
+              <span class="text-xs text-slate-500 dark:text-slate-400">guides the enhancement without changing your prompt</span>
+            </div>
+            <textarea
+              x-model="session.instruction"
+              @input="persist()"
+              rows="2"
+              placeholder="e.g. Make it more formal · Turn it into a step-by-step task · Add an output format section"
+              class="w-full resize-none bg-transparent p-4 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-100 dark:placeholder:text-slate-600"
+            ></textarea>
+          </div>
+
           <p x-show="error" x-cloak class="rounded-xl bg-rose-500/10 px-4 py-2.5 text-sm text-rose-700 dark:text-rose-300" x-text="error"></p>
 
           <button

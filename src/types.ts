@@ -44,6 +44,8 @@ export interface Session {
   updatedAt: number
   /** The prompt being edited in the middle column */
   draft: string
+  /** Optional user instruction guiding how the prompt should be enhanced */
+  instruction?: string
   /** Enhanced versions, oldest first */
   versions: PromptVersion[]
   settings: SessionSettings

@@ -18,7 +18,7 @@
   <body class="h-full bg-(--surface-page) text-(--text-secondary) antialiased">
     <div x-data="settingsApp" x-cloak class="flex min-h-full flex-col">
       <!-- Header -->
-      <header class="flex items-center justify-between border-b border-(--border-default) bg-white/70 px-4 py-3 backdrop-blur sm:px-6 dark:bg-slate-900/70">
+      <header class="flex items-center justify-between border-b border-(--border-default) bg-(--surface-header) px-4 py-3 backdrop-blur sm:px-6">
         <a href="./" class="flex items-center gap-2.5">
           <span class="grid size-8 place-items-center rounded-(--radius-sm) bg-(--accent-soft) text-lg">✨</span>
           <span class="text-base font-semibold tracking-tight text-(--text-primary)">Prompt Enhancer</span>
@@ -200,7 +200,7 @@
                       @click="setDefaultModel(provider, model.id)"
                       :title="provider.defaultModelId === model.id ? 'Default model — click to unset' : 'Set as default model for this provider'"
                       class="btn btn-ghost btn-xs px-1.5"
-                      :class="provider.defaultModelId === model.id ? 'text-amber-500' : 'text-(--text-faint)'"
+                      :class="provider.defaultModelId === model.id ? 'text-(--accent-text)' : 'text-(--text-faint)'"
                       x-text="provider.defaultModelId === model.id ? '★' : '☆'"
                     ></button>
                     <input
@@ -242,7 +242,7 @@
         <!-- Best practices -->
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-(--border-default) pt-6">
           <div>
-            <h1 class="text-lg font-semibold text-(--text-primary)">Best practices</h1>
+            <h2 class="text-lg font-semibold text-(--text-primary)">Best practices</h2>
             <p class="mt-0.5 text-sm text-(--text-muted)">
               Reusable prompting rules per target platform, model, or agent type.
               Select collections per column on the Enhance page; multiple collections can be combined.

@@ -16,6 +16,7 @@
   --surface-inset: var(--color-slate-50);
   --surface-field: var(--color-white);
   --surface-hover: var(--color-slate-100);
+  --surface-header: color-mix(in oklab, var(--color-white) 70%, transparent);
 
   /* Borders */
   --border-default: var(--color-slate-200);
@@ -63,6 +64,7 @@
   --surface-inset: color-mix(in oklab, var(--color-slate-800) 40%, transparent);
   --surface-field: var(--color-slate-800);
   --surface-hover: color-mix(in oklab, var(--color-slate-800) 70%, transparent);
+  --surface-header: color-mix(in oklab, var(--color-slate-900) 70%, transparent);
 
   --border-default: var(--color-slate-800);
   --border-strong: var(--color-slate-700);
@@ -95,6 +97,13 @@
 html,
 body {
   overflow-x: clip;
+}
+
+/* Internal scrollers (chain columns, reasoning, model picker) use slim,
+   token-colored scrollbars so scrolling chrome never dominates the panels. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
 }
 
 /* ---------------------------------------------------------------------------
@@ -135,6 +144,10 @@ body {
     border-color: var(--accent-hover);
     box-shadow: 0 0 0 3px var(--accent-ring);
   }
+  .field:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
   .field-xs {
     padding: 0.3125rem 0.5rem;
     font-size: 0.75rem;
@@ -150,6 +163,11 @@ body {
 
   .checkbox {
     accent-color: var(--accent);
+  }
+  .checkbox:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-ring);
+    border-radius: 0.25rem;
   }
 
   /* Buttons — .btn base + one variant + optional size */

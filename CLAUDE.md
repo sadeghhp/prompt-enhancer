@@ -28,6 +28,7 @@ on `<html>` (see `@custom-variant dark` in style.css), not the OS setting.
 | `--surface-inset` | Nested panels inside cards (`.card-inset`) |
 | `--surface-field` | Inputs, selects, textareas |
 | `--surface-hover` | Hover fill for ghost/outline controls and list rows |
+| `--surface-header` | Translucent page-header bar (pairs with `backdrop-blur`) |
 | `--border-default` | Card borders, dividers |
 | `--border-strong` | Field borders, outline buttons, dashed empty states |
 | `--text-primary` | Headings, titles, field values |
@@ -42,11 +43,13 @@ on `<html>` (see `@custom-variant dark` in style.css), not the OS setting.
 | `--success` / `--warning`, `--warning-soft` | Test-status / notice text |
 
 One accent only (indigo). Status colors are reserved for status, never
-decoration.
+decoration — selection markers (e.g. the default-model ★ in Settings) use
+the accent, not amber/gold.
 
 ### Typography scale
 
-System font stack (Tailwind default), antialiased. Four sizes only:
+System font stack (Tailwind default), antialiased. Four sizes only — never
+arbitrary sizes like `text-[11px]`:
 
 - `text-base` semibold — app title
 - `text-lg` semibold `--text-primary` — page headings (Settings)
@@ -90,8 +93,11 @@ Understated only: `--shadow-card` on `.card` and the version badge;
 - `.checkbox` — accent-colored checkboxes.
 
 Component states are built into the classes: hover via `:hover:not(:disabled)`,
-disabled = `opacity: 0.4` + `cursor: not-allowed`, keyboard focus via
-`:focus-visible` accent ring. Don't re-implement states with utilities.
+disabled = `opacity: 0.4` + `cursor: not-allowed` (buttons **and** fields),
+keyboard focus via `:focus-visible` accent ring (buttons, checkboxes) or
+`:focus` (fields). Don't re-implement states with utilities. Scrollbars are
+globally thin and token-colored (`scrollbar-color: var(--border-strong)`).
+Soft-tinted notices (warning/error strips) use `--radius-md`.
 
 ### Prompt-version display
 
@@ -104,6 +110,8 @@ number = the column's 1-based position in the chain. Rules:
   render at identical style; never truncate it.
 - Lineage is stated next to the badge: column 0 reads "Original prompt /
   written by you"; column *i* reads "Enhanced from v*i* / by {provider/model}".
+  The source version ("v*i*") is rendered in `--accent-text` + `tabular-nums`
+  so it visually echoes the badge and links consecutive versions.
 - Version numbers appear consistently everywhere the chain is referenced:
   the Enhance button ("Enhance → v{next}") and the nav counter
   ("Showing from v{n} of N links").

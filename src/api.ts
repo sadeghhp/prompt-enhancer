@@ -1,4 +1,4 @@
-import type { BestPracticeKind, EnhanceOptions, Provider, TargetSettings } from './types'
+import type { BestPracticeKind, EnhanceOptions, OutputFormat, Provider, TargetSettings } from './types'
 import { BEST_PRACTICE_KINDS } from './types'
 
 export interface TestResult {
@@ -108,6 +108,8 @@ export interface AppliedBestPractice {
 export interface EnhanceContext {
   options: EnhanceOptions
   outputLanguage: string
+  /** Formatting of the enhanced prompt text (plain/markdown/xml/json) */
+  outputFormat?: OutputFormat
   instruction?: string
   /** What the enhanced prompt should be optimized for (all fields optional) */
   target?: Pick<TargetSettings, 'platform' | 'model' | 'type'>
@@ -146,8 +148,23 @@ function describeBestPractices(rules: AppliedBestPractice[] | undefined): string
   return lines
 }
 
+function describeOutputFormat(format: OutputFormat | undefined): string {
+  switch (format) {
+    case 'markdown':
+      return 'Format the enhanced prompt as Markdown — use headings, lists, emphasis, and fenced code blocks where they improve readability.'
+    case 'xml':
+      return 'Structure the enhanced prompt with XML-style tags that delimit its sections (e.g. <task>, <context>, <constraints>, <output_format>).'
+    case 'json':
+      return 'Return the enhanced prompt as a single JSON object whose fields hold its parts (e.g. "role", "task", "context", "constraints", "output_format"). Output valid JSON only.'
+    case 'plain':
+      return 'Write the enhanced prompt as plain prose — no Markdown, XML, or JSON formatting.'
+    default:
+      return ''
+  }
+}
+
 function buildSystemPrompt(ctx: EnhanceContext): string {
-  const { options, outputLanguage, instruction } = ctx
+  const { options, outputLanguage, outputFormat, instruction } = ctx
   const goals: string[] = ['Fix grammar, spelling, and awkward phrasing.']
   if (options.clarity) goals.push('Maximize clarity and remove ambiguity.')
   if (options.structure) goals.push('Give the prompt a clean structure (role, task, context, constraints, output format) when it helps.')
@@ -163,13 +180,23 @@ function buildSystemPrompt(ctx: EnhanceContext): string {
     ...describeBestPractices(ctx.bestPractices),
     `Write the enhanced prompt in ${outputLanguage || 'English'}, regardless of the input language.`,
   ]
+  const formatLine = describeOutputFormat(outputFormat)
+  if (formatLine) lines.push(formatLine)
   if (instruction?.trim()) {
     lines.push(
       'The user also gave this instruction about how to enhance the prompt. It takes priority over the goals above — apply it faithfully, and treat it as guidance for the rewrite, NOT as content to answer or to insert verbatim:',
       `"""${instruction.trim()}"""`,
     )
   }
-  lines.push('Return ONLY the enhanced prompt text — no preamble, no explanations, no surrounding quotes or code fences.')
+  // Commentary is off by default: return only the prompt. When on, allow a
+  // clearly separated explanation of the changes after the prompt itself.
+  if (options.commentary) {
+    lines.push(
+      'After the enhanced prompt, add a section titled "Commentary" that briefly explains the key changes you made and why. Separate it clearly from the prompt (e.g. a "---" divider) so the prompt itself stays copy-pasteable.',
+    )
+  } else {
+    lines.push('Return ONLY the enhanced prompt text — no preamble, no explanations, no surrounding quotes or code fences.')
+  }
   return lines.join('\n')
 }
 

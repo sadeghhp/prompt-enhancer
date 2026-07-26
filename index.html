@@ -38,7 +38,7 @@
       <!-- Main: sessions sidebar + enhancement chain + Markdown preview.
            The preview is a full-width strip below the chain on md, and the
            fourth column (its own grid track) on xl and up. -->
-      <main class="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-[16rem_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)_auto] xl:grid-cols-[16rem_minmax(0,1fr)_22rem] xl:grid-rows-1">
+      <main class="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 md:grid-cols-[clamp(13.5rem,14vw,16rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)_auto] xl:grid-cols-[clamp(13.5rem,14vw,16rem)_minmax(0,1fr)_clamp(20rem,20vw,26rem)] xl:grid-rows-1">
         <!-- Left: sessions -->
         <aside class="card flex min-h-0 max-h-48 flex-col md:max-h-none">
           <div class="flex items-center justify-between border-b border-(--border-default) px-4 py-3">
@@ -213,7 +213,7 @@
                       <span class="text-sm font-semibold text-(--text-primary)">Advanced settings</span>
                       <span class="text-xs text-(--text-muted)" x-text="col.showAdvanced ? '▲' : '▼'"></span>
                     </button>
-                    <div x-show="col.showAdvanced" class="space-y-2.5 border-t border-(--border-default) px-3 py-2.5">
+                    <div x-show="col.showAdvanced" class="advanced-body space-y-2.5 border-t border-(--border-default) px-3 py-2.5">
                       <div class="grid grid-cols-2 gap-2 @lg:grid-cols-3">
                         <label class="block">
                           <span class="field-label">Enhancer provider</span>
@@ -243,7 +243,7 @@
                             </template>
                           </select>
                         </label>
-                        <label class="col-span-2 block @lg:col-span-1">
+                        <label class="block">
                           <span class="field-label">Output language</span>
                           <input
                             type="text"
@@ -253,6 +253,19 @@
                             placeholder="English"
                             class="field field-xs"
                           />
+                        </label>
+                        <label class="block">
+                          <span class="field-label">Output format</span>
+                          <select
+                            x-model="col.settings.outputFormat"
+                            x-effect="$nextTick(() => { $el.value = col.settings.outputFormat })"
+                            @change="persist()"
+                            class="field field-xs"
+                          >
+                            <template x-for="f in outputFormats" :key="f.value">
+                              <option :value="f.value" x-text="f.label"></option>
+                            </template>
+                          </select>
                         </label>
                       </div>
                       <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-(--text-secondary) @lg:grid-cols-3">
@@ -273,6 +286,9 @@
                         </label>
                         <label class="flex cursor-pointer items-center gap-1.5" title="Force a tight rewrite — brevity, efficiency, and clarity — without weakening the prompt">
                           <input type="checkbox" x-model="col.settings.options.brevity" @change="persist()" class="checkbox" /> Brevity
+                        </label>
+                        <label class="flex cursor-pointer items-center gap-1.5" title="Append a short explanation of the changes after the enhanced prompt">
+                          <input type="checkbox" x-model="col.settings.options.commentary" @change="persist()" class="checkbox" /> Commentary
                         </label>
                       </div>
 
@@ -371,45 +387,53 @@
                     </div>
                   </div>
 
-                  <!-- Editable prompt text -->
-                  <div class="chain-editor card flex min-h-0 flex-1 flex-col">
-                    <div class="border-b border-(--border-default) px-3 py-2 text-sm font-semibold text-(--text-primary)" x-text="i === 0 ? 'Your prompt' : 'Enhanced prompt'"></div>
-                    <textarea
-                      x-model="col.text"
-                      @input="touch()"
-                      :placeholder="i === 0 ? 'Write or paste the prompt you want to enhance — any language works.' : 'The enhanced prompt appears here — edit it freely before the next enhancement.'"
-                      class="min-h-0 flex-1 resize-none bg-transparent p-3 text-sm leading-relaxed text-(--text-primary) placeholder:text-(--text-faint) focus:outline-none"
-                    ></textarea>
-                  </div>
-
-                  <!-- Enhancement instruction (independent per column) -->
-                  <div class="card">
-                    <div class="flex flex-wrap items-baseline justify-between gap-x-2 border-b border-(--border-default) px-3 py-1.5">
-                      <span class="text-sm font-semibold text-(--text-primary)">Instruction <span class="font-normal text-(--text-faint)">(optional)</span></span>
-                      <span class="hidden text-xs text-(--text-muted) @lg:inline">guides this column's enhancement</span>
+                  <!-- Prompt editor + instruction + Enhance form one pinned
+                       group: it grows to fill the space left by the header,
+                       advanced, and reasoning panels above, so the instruction
+                       and Enhance button always sit at the bottom of the prompt
+                       area — expanding advanced settings shrinks the editor
+                       (which scrolls), never buries these controls. -->
+                  <div class="chain-editor-group flex min-h-0 flex-1 flex-col gap-2.5">
+                    <!-- Editable prompt text -->
+                    <div class="chain-editor card flex min-h-0 flex-1 flex-col">
+                      <div class="border-b border-(--border-default) px-3 py-2 text-sm font-semibold text-(--text-primary)" x-text="i === 0 ? 'Your prompt' : 'Enhanced prompt'"></div>
+                      <textarea
+                        x-model="col.text"
+                        @input="touch()"
+                        :placeholder="i === 0 ? 'Write or paste the prompt you want to enhance — any language works.' : 'The enhanced prompt appears here — edit it freely before the next enhancement.'"
+                        class="min-h-0 flex-1 resize-none bg-transparent p-3 text-sm leading-relaxed text-(--text-primary) placeholder:text-(--text-faint) focus:outline-none"
+                      ></textarea>
                     </div>
-                    <textarea
-                      x-model="col.instruction"
-                      @input="persist()"
-                      rows="2"
-                      placeholder="e.g. Make it more formal · Turn it into a step-by-step task"
-                      class="w-full resize-none bg-transparent px-3 py-2 text-sm leading-relaxed text-(--text-primary) placeholder:text-(--text-faint) focus:outline-none"
-                    ></textarea>
-                  </div>
 
-                  <!-- Enhance: generates the next link in the chain -->
-                  <div class="flex justify-end">
-                    <button
-                      @click="enhanceFrom(i)"
-                      :disabled="!canEnhance(col)"
-                      class="btn btn-primary w-1/3 rounded-(--radius-md) px-3 py-2.5"
-                    >
-                      <span x-show="!enhancing" class="truncate" x-text="`✨ Enhance → v${i + 2}`"></span>
-                      <span x-show="enhancing" x-cloak class="flex items-center gap-2">
-                        <span class="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
-                        Enhancing…
-                      </span>
-                    </button>
+                    <!-- Enhancement instruction (independent per column) -->
+                    <div class="card shrink-0">
+                      <div class="flex flex-wrap items-baseline justify-between gap-x-2 border-b border-(--border-default) px-3 py-1.5">
+                        <span class="text-sm font-semibold text-(--text-primary)">Instruction <span class="font-normal text-(--text-faint)">(optional)</span></span>
+                        <span class="hidden text-xs text-(--text-muted) @lg:inline">guides this column's enhancement</span>
+                      </div>
+                      <textarea
+                        x-model="col.instruction"
+                        @input="persist()"
+                        rows="2"
+                        placeholder="e.g. Make it more formal · Turn it into a step-by-step task"
+                        class="w-full resize-none bg-transparent px-3 py-2 text-sm leading-relaxed text-(--text-primary) placeholder:text-(--text-faint) focus:outline-none"
+                      ></textarea>
+                    </div>
+
+                    <!-- Enhance: generates the next link in the chain -->
+                    <div class="flex shrink-0 justify-end">
+                      <button
+                        @click="enhanceFrom(i)"
+                        :disabled="!canEnhance(col)"
+                        class="btn btn-primary w-1/3 rounded-(--radius-md) px-3 py-2.5"
+                      >
+                        <span x-show="!enhancing" class="truncate" x-text="`✨ Enhance → v${i + 2}`"></span>
+                        <span x-show="enhancing" x-cloak class="flex items-center gap-2">
+                          <span class="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
+                          Enhancing…
+                        </span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </template>

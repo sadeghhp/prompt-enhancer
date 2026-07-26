@@ -92,7 +92,19 @@ export interface EnhanceOptions {
   preserveIntent: boolean
   /** Force a tight rewrite: brevity, efficiency, and clarity, without weakening the prompt */
   brevity: boolean
+  /** Append a short "Commentary" section explaining the changes made */
+  commentary: boolean
 }
+
+/** How the enhanced prompt text itself is formatted. */
+export type OutputFormat = 'plain' | 'markdown' | 'xml' | 'json'
+
+export const OUTPUT_FORMATS: { value: OutputFormat; label: string }[] = [
+  { value: 'plain', label: 'Plain text' },
+  { value: 'markdown', label: 'Markdown' },
+  { value: 'xml', label: 'XML tags' },
+  { value: 'json', label: 'JSON' },
+]
 
 export interface ColumnSettings {
   /** Provider whose model performs the enhancement (the enhancer) */
@@ -100,6 +112,8 @@ export interface ColumnSettings {
   /** Enhancer model — generates the next prompt version */
   modelId: string
   outputLanguage: string
+  /** Formatting of the enhanced prompt (plain/markdown/xml/json) */
+  outputFormat: OutputFormat
   options: EnhanceOptions
   /** Optional: what the enhanced prompt should be optimized for */
   target: TargetSettings
@@ -159,6 +173,28 @@ export const DEFAULT_OPTIONS: EnhanceOptions = {
   tokenEfficiency: true,
   preserveIntent: true,
   brevity: false,
+  commentary: false,
+}
+
+/**
+ * User-configurable defaults applied to every new enhancement. New sessions
+ * and enhanced links start from these; each column can still override them
+ * in its own Advanced settings. Configured on the Settings page and persisted
+ * to localStorage.
+ */
+export interface DefaultSettings {
+  outputLanguage: string
+  outputFormat: OutputFormat
+  options: EnhanceOptions
+}
+
+/** The out-of-the-box defaults, used before the user customizes them. */
+export function factoryDefaults(): DefaultSettings {
+  return {
+    outputLanguage: 'English',
+    outputFormat: 'markdown',
+    options: { ...DEFAULT_OPTIONS },
+  }
 }
 
 export function uid(): string {

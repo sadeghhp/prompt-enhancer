@@ -2,8 +2,8 @@ import Alpine from 'alpinejs'
 import { fetchProviderModels, testModel, testProvider } from './api'
 import { storage } from './storage'
 import { applyTheme, loadTheme, saveTheme } from './theme'
-import { BEST_PRACTICE_KINDS, TARGET_PLATFORMS, uid } from './types'
-import type { BestPracticeCollection, Provider } from './types'
+import { BEST_PRACTICE_KINDS, OUTPUT_FORMATS, TARGET_PLATFORMS, factoryDefaults, uid } from './types'
+import type { BestPracticeCollection, DefaultSettings, Provider } from './types'
 
 interface TestState {
   status: 'idle' | 'running' | 'ok' | 'error'
@@ -32,7 +32,9 @@ const PICKER_PAGE = 200
 Alpine.data('settingsApp', () => ({
   providers: [] as Provider[],
   bestPractices: [] as BestPracticeCollection[],
+  defaults: factoryDefaults() as DefaultSettings,
   practiceKinds: BEST_PRACTICE_KINDS,
+  outputFormats: OUTPUT_FORMATS,
   targetPlatforms: TARGET_PLATFORMS,
   /** Test state keyed by provider id or `${providerId}:${modelId}` */
   tests: {} as Record<string, TestState>,
@@ -50,10 +52,21 @@ Alpine.data('settingsApp', () => ({
   init() {
     this.providers = storage.loadProviders()
     this.bestPractices = storage.loadBestPractices()
+    this.defaults = storage.loadDefaults()
   },
 
   persist() {
     storage.saveProviders(this.providers)
+  },
+
+  persistDefaults() {
+    storage.saveDefaults(this.defaults)
+  },
+
+  /** Reset the enhancement defaults back to the out-of-the-box values. */
+  resetDefaults() {
+    this.defaults = factoryDefaults()
+    this.persistDefaults()
   },
 
   persistPractices() {

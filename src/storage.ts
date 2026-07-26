@@ -1,10 +1,12 @@
-import type { BestPracticeCollection, Provider, Session } from './types'
+import type { BestPracticeCollection, DefaultSettings, Provider, Session } from './types'
+import { factoryDefaults } from './types'
 
 const KEYS = {
   providers: 'pe.providers',
   sessions: 'pe.sessions',
   activeSession: 'pe.activeSession',
   bestPractices: 'pe.bestPractices',
+  defaults: 'pe.defaults',
 } as const
 
 function load<T>(key: string, fallback: T): T {
@@ -38,4 +40,19 @@ export const storage = {
     load<BestPracticeCollection[]>(KEYS.bestPractices, []),
   saveBestPractices: (collections: BestPracticeCollection[]) =>
     save(KEYS.bestPractices, collections),
+
+  /**
+   * Merge stored defaults over the factory defaults so fields added after a
+   * user first saved (e.g. new option toggles) always resolve to a value.
+   */
+  loadDefaults: (): DefaultSettings => {
+    const base = factoryDefaults()
+    const stored = load<Partial<DefaultSettings>>(KEYS.defaults, {})
+    return {
+      outputLanguage: stored.outputLanguage ?? base.outputLanguage,
+      outputFormat: stored.outputFormat ?? base.outputFormat,
+      options: { ...base.options, ...(stored.options ?? {}) },
+    }
+  },
+  saveDefaults: (defaults: DefaultSettings) => save(KEYS.defaults, defaults),
 }

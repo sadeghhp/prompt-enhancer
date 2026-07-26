@@ -53,9 +53,11 @@
   --shadow-pop: 0 4px 16px rgb(15 23 42 / 0.1);
 
   /* Chain layout: horizontal step per viewIndex increment.
-     Desktop shows three columns so the next links' Copy buttons are
-     immediately reachable; below lg one column + a peek (see media query). */
-  --chain-step: 33.333%;
+     Desktop default shows two columns so a version and its enhancement sit
+     side by side — the core comparison. A third column only appears once
+     each is wide enough (≥1800px); below lg one column + a peek. Both
+     overrides live in media queries below. */
+  --chain-step: 50%;
 }
 
 .dark {
@@ -459,8 +461,20 @@ body {
 .chain-card > * {
   flex-shrink: 0;
 }
+/* The editor group is the one column child allowed to shrink: it soaks up the
+   space left by the header/advanced/reasoning panels, keeping the instruction
+   and Enhance button pinned to the bottom of the prompt area at all times. */
+.chain-card > .chain-editor-group {
+  flex-shrink: 1;
+}
 .chain-editor {
-  min-height: 16rem;
+  min-height: 10rem;
+}
+/* Expanding advanced settings must never push the prompt controls off-column:
+   cap the panel and let it scroll inside itself instead of growing the column. */
+.advanced-body {
+  max-height: 40vh;
+  overflow-y: auto;
 }
 
 /* Links behind the leading column are history: faded and inert */
@@ -470,12 +484,14 @@ body {
   pointer-events: none;
 }
 
-/* Desktop with the Markdown preview pane (xl up to 2xl): the chain viewport
-   gives up its right edge to the preview column, so show two chain columns
-   per step instead of three. From 2xl there is room for three again. */
-@media (min-width: 1280px) and (max-width: 1535px) {
+/* Only introduce a third visible column once the viewport is wide enough
+   that each column still clears ~400px — enough to trip the column's own
+   @lg container query and relax its settings grid to three-up. Below this
+   the default two-column comparison holds across the whole desktop range,
+   so widening past the preview breakpoint never shrinks the columns. */
+@media (min-width: 1800px) {
   :root {
-    --chain-step: 50%;
+    --chain-step: 33.333%;
   }
 }
 
@@ -486,6 +502,6 @@ body {
     --chain-step: 94%;
   }
   .chain-editor {
-    min-height: 18rem;
+    min-height: 12rem;
   }
 }

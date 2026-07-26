@@ -239,6 +239,68 @@
           OpenAI, OpenRouter, Groq, Mistral, and local servers (Ollama, LM Studio) all work.
         </p>
 
+        <!-- Default settings -->
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-(--border-default) pt-6">
+          <div>
+            <h2 class="text-lg font-semibold text-(--text-primary)">Default settings</h2>
+            <p class="mt-0.5 text-sm text-(--text-muted)">
+              Applied to every new enhancement. Any column can still override these in its own
+              Advanced settings on the Enhance page.
+            </p>
+          </div>
+          <button @click="resetDefaults()" class="btn btn-outline btn-xs">Reset to defaults</button>
+        </div>
+
+        <section class="card p-5">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label class="block">
+              <span class="field-label">Output language</span>
+              <input
+                type="text" x-model="defaults.outputLanguage" @change="persistDefaults()"
+                list="default-languages" placeholder="English"
+                class="field"
+              />
+            </label>
+            <label class="block">
+              <span class="field-label">Output format</span>
+              <select x-model="defaults.outputFormat" @change="persistDefaults()" class="field">
+                <template x-for="f in outputFormats" :key="f.value">
+                  <option :value="f.value" x-text="f.label"></option>
+                </template>
+              </select>
+            </label>
+          </div>
+
+          <div class="mt-4 border-t border-(--border-default) pt-4">
+            <h3 class="mb-2 text-sm font-semibold text-(--text-primary)">
+              Enhancement goals <span class="font-normal text-(--text-faint)">(on by default)</span>
+            </h3>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-(--text-secondary) sm:grid-cols-3">
+              <label class="flex cursor-pointer items-center gap-1.5">
+                <input type="checkbox" x-model="defaults.options.clarity" @change="persistDefaults()" class="checkbox" /> Clarity
+              </label>
+              <label class="flex cursor-pointer items-center gap-1.5">
+                <input type="checkbox" x-model="defaults.options.structure" @change="persistDefaults()" class="checkbox" /> Structure
+              </label>
+              <label class="flex cursor-pointer items-center gap-1.5">
+                <input type="checkbox" x-model="defaults.options.bestPractices" @change="persistDefaults()" class="checkbox" /> Best practices
+              </label>
+              <label class="flex cursor-pointer items-center gap-1.5">
+                <input type="checkbox" x-model="defaults.options.tokenEfficiency" @change="persistDefaults()" class="checkbox" /> Token efficiency
+              </label>
+              <label class="flex cursor-pointer items-center gap-1.5">
+                <input type="checkbox" x-model="defaults.options.preserveIntent" @change="persistDefaults()" class="checkbox" /> Preserve intent
+              </label>
+              <label class="flex cursor-pointer items-center gap-1.5" title="Force a tight rewrite — brevity, efficiency, and clarity — without weakening the prompt">
+                <input type="checkbox" x-model="defaults.options.brevity" @change="persistDefaults()" class="checkbox" /> Brevity
+              </label>
+              <label class="flex cursor-pointer items-center gap-1.5" title="Append a short explanation of the changes after the enhanced prompt">
+                <input type="checkbox" x-model="defaults.options.commentary" @change="persistDefaults()" class="checkbox" /> Commentary
+              </label>
+            </div>
+          </div>
+        </section>
+
         <!-- Best practices -->
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-(--border-default) pt-6">
           <div>
@@ -335,6 +397,11 @@
 
         <datalist id="bp-target-platforms">
           <template x-for="p in targetPlatforms" :key="p"><option :value="p"></option></template>
+        </datalist>
+        <datalist id="default-languages">
+          <option>English</option><option>Persian</option><option>German</option>
+          <option>French</option><option>Spanish</option><option>Arabic</option>
+          <option>Chinese</option><option>Japanese</option>
         </datalist>
       </main>
 

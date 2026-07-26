@@ -18,6 +18,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Verify GitHub Pages is enabled
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ github.token }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/pages")
+          if [ "$code" != "200" ]; then
+            echo "::error title=GitHub Pages not enabled::Open https://github.com/${{ github.repository }}/settings/pages → Build and deployment → Source → GitHub Actions, then re-run this workflow."
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -26,11 +37,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-
-      # Must run after Pages is enabled once under Settings → Pages → Source: GitHub Actions
-      - name: Setup Pages
-        id: pages
-        uses: actions/configure-pages@v6
 
       - name: Install dependencies
         run: npm ci

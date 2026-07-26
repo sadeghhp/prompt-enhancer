@@ -49,11 +49,15 @@ Pushing to `main` builds and publishes the static site to GitHub Pages via
 
 **One-time setup** (repo admin):
 
-1. Open **Settings → Pages**.
+1. Open **[Settings → Pages](https://github.com/sadeghhp/prompt-enhancer/settings/pages)**.
 2. Under **Build and deployment**, set **Source** to **GitHub Actions** (not
    “Deploy from a branch”).
 3. Push to `main` or re-run the **Deploy to GitHub Pages** workflow from the
    **Actions** tab.
+
+> **Note:** The workflow cannot enable Pages automatically — GitHub does not
+> allow `GITHUB_TOKEN` to create a Pages site. You must flip this switch once
+> in the repo settings.
 
 The site is served at `https://<owner>.github.io/prompt-enhancer/`. Vite uses a
 relative `base` (`./`) so assets and navigation work under that subpath.

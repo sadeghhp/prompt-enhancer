@@ -15,76 +15,67 @@
     <link rel="stylesheet" href="/src/style.css" />
     <script type="module" src="/src/settings-page.ts"></script>
   </head>
-  <body class="h-full bg-slate-100 text-slate-700 antialiased dark:bg-slate-950 dark:text-slate-200">
+  <body class="h-full bg-(--surface-page) text-(--text-secondary) antialiased">
     <div x-data="settingsApp" x-cloak class="flex min-h-full flex-col">
       <!-- Header -->
-      <header class="flex items-center justify-between border-b border-slate-200 bg-white/70 px-6 py-3 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
-        <a href="/" class="flex items-center gap-2.5">
-          <span class="grid size-8 place-items-center rounded-lg bg-indigo-500/20 text-lg">✨</span>
-          <span class="text-base font-semibold tracking-tight text-slate-900 dark:text-white">Prompt Enhancer</span>
+      <header class="flex items-center justify-between border-b border-(--border-default) bg-white/70 px-4 py-3 backdrop-blur sm:px-6 dark:bg-slate-900/70">
+        <a href="./" class="flex items-center gap-2.5">
+          <span class="grid size-8 place-items-center rounded-(--radius-sm) bg-(--accent-soft) text-lg">✨</span>
+          <span class="text-base font-semibold tracking-tight text-(--text-primary)">Prompt Enhancer</span>
         </a>
         <nav class="flex items-center gap-1 text-sm">
-          <a href="/" class="rounded-lg px-3 py-1.5 text-slate-500 transition hover:bg-slate-200 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white">Enhance</a>
-          <a href="/settings.html" class="rounded-lg bg-slate-200 px-3 py-1.5 font-medium text-slate-900 dark:bg-slate-800 dark:text-white">Settings</a>
+          <a href="./" class="btn btn-ghost">Enhance</a>
+          <a href="./settings.html" class="btn btn-soft">Settings</a>
           <button
             @click="toggleTheme()"
             :title="theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'"
-            class="ml-1 rounded-lg px-2.5 py-1.5 text-slate-500 transition hover:bg-slate-200 dark:text-slate-400 dark:hover:bg-slate-800"
+            class="btn btn-ghost ml-1 px-2.5"
             x-text="theme === 'dark' ? '☀️' : '🌙'"
           ></button>
         </nav>
       </header>
 
-      <main class="mx-auto w-full max-w-4xl flex-1 space-y-4 p-6">
-        <div class="flex items-center justify-between">
+      <main class="mx-auto w-full max-w-4xl flex-1 space-y-4 p-4 sm:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 class="text-lg font-semibold text-slate-900 dark:text-white">LLM providers</h1>
-            <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+            <h1 class="text-lg font-semibold text-(--text-primary)">LLM providers</h1>
+            <p class="mt-0.5 text-sm text-(--text-muted)">
               Add any OpenAI-compatible provider. Keys are stored only in your browser.
             </p>
           </div>
-          <button
-            @click="addProvider()"
-            class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
-          >+ Add provider</button>
+          <button @click="addProvider()" class="btn btn-primary">+ Add provider</button>
         </div>
 
         <template x-if="providers.length === 0">
-          <div class="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500 dark:border-slate-700">
+          <div class="rounded-(--radius-lg) border border-dashed border-(--border-strong) p-10 text-center text-sm text-(--text-muted)">
             No providers yet. Add one to start enhancing prompts —
             e.g. OpenAI, OpenRouter, Groq, Together, or a local server like Ollama / LM Studio.
           </div>
         </template>
 
         <template x-for="provider in providers" :key="provider.id">
-          <section class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/50">
+          <section class="card p-5">
             <!-- Provider fields -->
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label class="block">
-                <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Name</span>
-                <input
-                  type="text" x-model="provider.name" @change="persist()" placeholder="OpenAI"
-                  class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                />
+                <span class="field-label">Name</span>
+                <input type="text" x-model="provider.name" @change="persist()" placeholder="OpenAI" class="field" />
               </label>
               <label class="block">
-                <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Base URL (OpenAI-compatible)</span>
-                <input
-                  type="text" x-model="provider.baseUrl" @change="persist()" placeholder="https://api.openai.com/v1"
-                  class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                />
+                <span class="field-label">Base URL (OpenAI-compatible)</span>
+                <input type="text" x-model="provider.baseUrl" @change="persist()" placeholder="https://api.openai.com/v1" class="field" />
               </label>
-              <label class="col-span-2 block">
-                <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">API key</span>
+              <label class="block sm:col-span-2">
+                <span class="field-label">API key</span>
                 <div class="flex gap-2">
                   <input
                     :type="revealedKeys[provider.id] ? 'text' : 'password'"
                     x-model="provider.apiKey" @change="persist()" placeholder="sk-…"
-                    class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    class="field"
                   />
                   <button
                     @click="revealedKeys[provider.id] = !revealedKeys[provider.id]"
-                    class="shrink-0 rounded-lg border border-slate-300 px-3 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                    class="btn btn-outline btn-xs shrink-0"
                     x-text="revealedKeys[provider.id] ? 'Hide' : 'Show'"
                   ></button>
                 </div>
@@ -96,63 +87,52 @@
               <button
                 @click="runProviderTest(provider)"
                 :disabled="testState(provider.id).status === 'running'"
-                class="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-800 transition hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
+                class="btn btn-soft btn-xs"
               >Test provider</button>
               <span
                 class="text-xs"
                 :class="{
-                  'text-emerald-600 dark:text-emerald-400': testState(provider.id).status === 'ok',
-                  'text-rose-600 dark:text-rose-400': testState(provider.id).status === 'error',
-                  'text-slate-500 dark:text-slate-400': testState(provider.id).status === 'running',
+                  'text-(--success)': testState(provider.id).status === 'ok',
+                  'text-(--danger)': testState(provider.id).status === 'error',
+                  'text-(--text-muted)': testState(provider.id).status === 'running',
                 }"
                 x-text="testState(provider.id).message"
               ></span>
-              <button
-                @click="removeProvider(provider.id)"
-                class="ml-auto rounded-lg px-3 py-1.5 text-xs text-rose-600 transition hover:bg-rose-500/10 dark:text-rose-400"
-              >Remove provider</button>
+              <button @click="removeProvider(provider.id)" class="btn btn-danger-ghost btn-xs ml-auto">Remove provider</button>
             </div>
 
             <!-- Models -->
-            <div class="mt-4 border-t border-slate-200 pt-4 dark:border-slate-800">
+            <div class="mt-4 border-t border-(--border-default) pt-4">
               <div class="mb-2 flex items-center justify-between gap-2">
-                <h3 class="text-sm font-medium text-slate-900 dark:text-white">Models</h3>
+                <h3 class="text-sm font-semibold text-(--text-primary)">Models</h3>
                 <div class="flex items-center gap-2">
                   <button
                     @click="openModelPicker(provider)"
                     :disabled="pickers[provider.id]?.status === 'loading'"
-                    class="rounded-lg bg-indigo-600/10 px-2.5 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-600/20 disabled:opacity-50 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+                    class="btn btn-soft btn-xs"
                     x-text="pickers[provider.id]?.status === 'loading' ? 'Fetching…' : '⟳ Fetch models'"
                   ></button>
-                  <button
-                    @click="addModel(provider)"
-                    class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >+ Add manually</button>
+                  <button @click="addModel(provider)" class="btn btn-outline btn-xs">+ Add manually</button>
                 </div>
               </div>
 
               <!-- Fetch & pick models panel -->
               <template x-if="pickers[provider.id]">
-                <div class="mb-3 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/5">
+                <div class="mb-3 rounded-(--radius-md) border border-(--accent-ring) bg-(--accent-soft) p-3">
                   <template x-if="pickers[provider.id].status !== 'ready'">
                     <div class="flex items-center justify-between gap-2">
                       <span
                         class="text-xs"
-                        :class="pickers[provider.id].status === 'error'
-                          ? 'text-rose-600 dark:text-rose-400'
-                          : 'text-slate-500 dark:text-slate-400'"
+                        :class="pickers[provider.id].status === 'error' ? 'text-(--danger)' : 'text-(--text-muted)'"
                         x-text="pickers[provider.id].message"
                       ></span>
                       <div class="flex shrink-0 gap-2">
                         <button
                           x-show="pickers[provider.id].status === 'error'"
                           @click="openModelPicker(provider)"
-                          class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                          class="btn btn-outline btn-xs"
                         >Retry</button>
-                        <button
-                          @click="closeModelPicker(provider.id)"
-                          class="rounded-lg px-2.5 py-1 text-xs text-slate-500 transition hover:bg-slate-200 dark:hover:bg-slate-800"
-                        >Close</button>
+                        <button @click="closeModelPicker(provider.id)" class="btn btn-ghost btn-xs">Close</button>
                       </div>
                     </div>
                   </template>
@@ -164,54 +144,44 @@
                           x-model="pickers[provider.id].filter"
                           @input="pickers[provider.id].limit = 200"
                           placeholder="Filter models… (e.g. gpt mini)"
-                          class="w-64 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                          class="field field-xs w-64"
                         />
                         <button
                           @click="selectAllFiltered(pickers[provider.id])"
                           title="Select every model matching the current filter"
-                          class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                          class="btn btn-outline btn-xs"
                         >Select all</button>
-                        <button
-                          @click="clearPickerSelection(pickers[provider.id])"
-                          class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                        >Clear selection</button>
+                        <button @click="clearPickerSelection(pickers[provider.id])" class="btn btn-outline btn-xs">Clear selection</button>
                         <span
-                          class="ml-auto text-xs text-slate-500 dark:text-slate-400"
+                          class="ml-auto text-xs text-(--text-muted) tabular-nums"
                           x-text="`${pickerSelectedCount(pickers[provider.id])} selected · ${filteredPickerModels(pickers[provider.id]).length} of ${pickers[provider.id].available.length} match`"
                         ></span>
                       </div>
-                      <ul class="mt-2 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                      <ul class="mt-2 max-h-64 overflow-y-auto rounded-(--radius-sm) border border-(--border-default) bg-(--surface-field)">
                         <template x-for="m in visiblePickerModels(pickers[provider.id])" :key="m">
                           <li>
-                            <label class="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-xs text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">
-                              <input
-                                type="checkbox"
-                                x-model="pickers[provider.id].selected[m]"
-                                class="size-3.5 accent-indigo-600"
-                              />
+                            <label class="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-xs text-(--text-secondary) transition hover:bg-(--surface-hover)">
+                              <input type="checkbox" x-model="pickers[provider.id].selected[m]" class="checkbox size-3.5" />
                               <span class="truncate font-mono" x-text="m" :title="m"></span>
                             </label>
                           </li>
                         </template>
                         <li
                           x-show="filteredPickerModels(pickers[provider.id]).length === 0"
-                          class="px-3 py-2 text-xs text-slate-500"
+                          class="px-3 py-2 text-xs text-(--text-muted)"
                         >No models match this filter.</li>
                       </ul>
                       <button
                         x-show="filteredPickerModels(pickers[provider.id]).length > pickers[provider.id].limit"
                         @click="pickers[provider.id].limit += 200"
-                        class="mt-1.5 w-full rounded-lg border border-dashed border-slate-300 py-1 text-xs text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                        class="mt-1.5 w-full rounded-(--radius-sm) border border-dashed border-(--border-strong) py-1 text-xs text-(--text-muted) transition hover:bg-(--surface-hover)"
                         x-text="`Show more (${filteredPickerModels(pickers[provider.id]).length - pickers[provider.id].limit} hidden)`"
                       ></button>
                       <div class="mt-2 flex items-center justify-end gap-2">
-                        <button
-                          @click="closeModelPicker(provider.id)"
-                          class="rounded-lg px-3 py-1.5 text-xs text-slate-500 transition hover:bg-slate-200 dark:hover:bg-slate-800"
-                        >Cancel</button>
+                        <button @click="closeModelPicker(provider.id)" class="btn btn-ghost btn-xs">Cancel</button>
                         <button
                           @click="applyModelSelection(provider)"
-                          class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500"
+                          class="btn btn-primary btn-xs"
                           x-text="`Use ${pickerSelectedCount(pickers[provider.id])} selected models`"
                         ></button>
                       </div>
@@ -220,46 +190,43 @@
                 </div>
               </template>
 
-              <p x-show="provider.models.length === 0 && !pickers[provider.id]" class="text-xs text-slate-500">
+              <p x-show="provider.models.length === 0 && !pickers[provider.id]" class="text-xs text-(--text-muted)">
                 No models yet — fetch the provider's model list, or add model IDs manually (e.g. gpt-4o-mini).
               </p>
               <ul class="space-y-2">
                 <template x-for="model in provider.models" :key="model.id">
-                  <li class="flex flex-wrap items-center gap-2 rounded-xl bg-slate-100 p-2.5 dark:bg-slate-800/60">
+                  <li class="card-inset flex flex-wrap items-center gap-2 p-2.5">
                     <button
                       @click="setDefaultModel(provider, model.id)"
                       :title="provider.defaultModelId === model.id ? 'Default model — click to unset' : 'Set as default model for this provider'"
-                      class="rounded-lg px-1.5 py-1 text-sm transition hover:bg-slate-200 dark:hover:bg-slate-700"
-                      :class="provider.defaultModelId === model.id ? 'text-amber-500' : 'text-slate-400 dark:text-slate-500'"
+                      class="btn btn-ghost btn-xs px-1.5"
+                      :class="provider.defaultModelId === model.id ? 'text-amber-500' : 'text-(--text-faint)'"
                       x-text="provider.defaultModelId === model.id ? '★' : '☆'"
                     ></button>
                     <input
                       type="text" x-model="model.modelId" @change="persist()" placeholder="Model ID, e.g. gpt-4o-mini"
-                      class="w-56 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                      class="field field-xs w-56"
                     />
                     <input
                       type="text" x-model="model.label" @change="persist()" placeholder="Display name (optional)"
-                      class="w-44 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                      class="field field-xs w-44"
                     />
                     <button
                       @click="runModelTest(provider, model.id)"
                       :disabled="!model.modelId || testState(`${provider.id}:${model.id}`).status === 'running'"
-                      class="rounded-lg bg-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-800 transition hover:bg-slate-300 disabled:opacity-50 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
+                      class="btn btn-soft btn-xs"
                     >Test</button>
                     <span
                       class="min-w-0 flex-1 truncate text-xs"
                       :title="testState(`${provider.id}:${model.id}`).message"
                       :class="{
-                        'text-emerald-600 dark:text-emerald-400': testState(`${provider.id}:${model.id}`).status === 'ok',
-                        'text-rose-600 dark:text-rose-400': testState(`${provider.id}:${model.id}`).status === 'error',
-                        'text-slate-500 dark:text-slate-400': testState(`${provider.id}:${model.id}`).status === 'running',
+                        'text-(--success)': testState(`${provider.id}:${model.id}`).status === 'ok',
+                        'text-(--danger)': testState(`${provider.id}:${model.id}`).status === 'error',
+                        'text-(--text-muted)': testState(`${provider.id}:${model.id}`).status === 'running',
                       }"
                       x-text="testState(`${provider.id}:${model.id}`).message"
                     ></span>
-                    <button
-                      @click="removeModel(provider, model.id)"
-                      class="rounded-lg px-2 py-1.5 text-xs text-rose-600 transition hover:bg-rose-500/10 dark:text-rose-400"
-                    >✕</button>
+                    <button @click="removeModel(provider, model.id)" class="btn btn-danger-ghost btn-xs px-2">✕</button>
                   </li>
                 </template>
               </ul>
@@ -267,79 +234,70 @@
           </section>
         </template>
 
-        <p class="text-xs text-slate-500">
+        <p class="text-xs text-(--text-muted)">
           Note: the provider must allow cross-origin (CORS) requests from the browser.
           OpenAI, OpenRouter, Groq, Mistral, and local servers (Ollama, LM Studio) all work.
         </p>
 
         <!-- Best practices -->
-        <div class="flex items-center justify-between border-t border-slate-200 pt-6 dark:border-slate-800">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-(--border-default) pt-6">
           <div>
-            <h1 class="text-lg font-semibold text-slate-900 dark:text-white">Best practices</h1>
-            <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+            <h1 class="text-lg font-semibold text-(--text-primary)">Best practices</h1>
+            <p class="mt-0.5 text-sm text-(--text-muted)">
               Reusable prompting rules per target platform, model, or agent type.
               Select collections per column on the Enhance page; multiple collections can be combined.
             </p>
           </div>
-          <button
-            @click="addCollection()"
-            class="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
-          >+ Add collection</button>
+          <button @click="addCollection()" class="btn btn-primary">+ Add collection</button>
         </div>
 
         <template x-if="bestPractices.length === 0">
-          <div class="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-sm text-slate-500 dark:border-slate-700">
+          <div class="rounded-(--radius-lg) border border-dashed border-(--border-strong) p-10 text-center text-sm text-(--text-muted)">
             No best-practice collections yet. Create one per target —
             e.g. "Claude Code rules", "ChatGPT conventions", or "Cursor rules".
           </div>
         </template>
 
         <template x-for="collection in bestPractices" :key="collection.id">
-          <section class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/50">
-            <div class="grid grid-cols-2 gap-3">
+          <section class="card p-5">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label class="block">
-                <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Collection name</span>
+                <span class="field-label">Collection name</span>
                 <input
                   type="text" x-model="collection.name" @change="persistPractices()" placeholder="e.g. Claude Code rules"
-                  class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  class="field"
                 />
               </label>
               <label class="block">
-                <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Target (platform, model, or agent type)</span>
+                <span class="field-label">Target (platform, model, or agent type)</span>
                 <input
                   type="text" x-model="collection.target" @change="persistPractices()" list="bp-target-platforms" placeholder="e.g. Claude Code"
-                  class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                  class="field"
                 />
               </label>
             </div>
 
-            <div class="mt-4 border-t border-slate-200 pt-4 dark:border-slate-800">
+            <div class="mt-4 border-t border-(--border-default) pt-4">
               <div class="mb-2 flex items-center justify-between">
-                <h3 class="text-sm font-medium text-slate-900 dark:text-white">
-                  Rules <span class="font-normal text-slate-400 dark:text-slate-500">(applied top to bottom)</span>
+                <h3 class="text-sm font-semibold text-(--text-primary)">
+                  Rules <span class="font-normal text-(--text-faint)">(applied top to bottom)</span>
                 </h3>
-                <button
-                  @click="addPracticeItem(collection)"
-                  class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                >+ Add rule</button>
+                <button @click="addPracticeItem(collection)" class="btn btn-outline btn-xs">+ Add rule</button>
               </div>
 
-              <p x-show="collection.items.length === 0" class="text-xs text-slate-500">
+              <p x-show="collection.items.length === 0" class="text-xs text-(--text-muted)">
                 No rules yet — add plain-text guidance, individual rules, structured blocks, or Cursor-style rules.
               </p>
 
               <ul class="space-y-2">
                 <template x-for="(item, idx) in collection.items" :key="item.id">
-                  <li class="rounded-xl bg-slate-100 p-2.5 dark:bg-slate-800/60" :class="item.enabled ? '' : 'opacity-60'">
+                  <li class="card-inset p-2.5" :class="item.enabled ? '' : 'opacity-60'">
                     <div class="flex flex-wrap items-center gap-2">
-                      <label class="flex cursor-pointer items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300" title="Disabled rules stay saved but are not applied">
-                        <input type="checkbox" x-model="item.enabled" @change="persistPractices()" class="accent-indigo-500" />
+                      <label class="flex cursor-pointer items-center gap-1.5 text-xs text-(--text-secondary)" title="Disabled rules stay saved but are not applied">
+                        <input type="checkbox" x-model="item.enabled" @change="persistPractices()" class="checkbox" />
                         Enabled
                       </label>
-                      <select
-                        x-model="item.kind" @change="persistPractices()"
-                        class="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-                      >
+                      <select x-model="item.kind" @change="persistPractices()" class="field field-xs w-auto">
                         <template x-for="k in practiceKinds" :key="k.value">
                           <option :value="k.value" x-text="k.label"></option>
                         </template>
@@ -347,22 +305,22 @@
                       <span class="ml-auto flex items-center gap-1">
                         <button
                           @click="movePracticeItem(collection, idx, -1)" :disabled="idx === 0" title="Move up"
-                          class="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700"
+                          class="btn btn-outline btn-xs px-2"
                         >↑</button>
                         <button
                           @click="movePracticeItem(collection, idx, 1)" :disabled="idx === collection.items.length - 1" title="Move down"
-                          class="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600 transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700"
+                          class="btn btn-outline btn-xs px-2"
                         >↓</button>
                         <button
                           @click="removePracticeItem(collection, item.id)" title="Remove rule"
-                          class="rounded-lg px-2 py-1 text-xs text-rose-600 transition hover:bg-rose-500/10 dark:text-rose-400"
+                          class="btn btn-danger-ghost btn-xs px-2"
                         >✕</button>
                       </span>
                     </div>
                     <textarea
                       x-model="item.content" @change="persistPractices()" rows="2"
                       placeholder="e.g. Reference files as path:line · State acceptance criteria explicitly · Keep instructions imperative"
-                      class="mt-2 w-full resize-y rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-600"
+                      class="field field-xs mt-2 resize-y leading-relaxed"
                     ></textarea>
                   </li>
                 </template>
@@ -370,10 +328,7 @@
             </div>
 
             <div class="mt-3 flex justify-end">
-              <button
-                @click="removeCollection(collection.id)"
-                class="rounded-lg px-3 py-1.5 text-xs text-rose-600 transition hover:bg-rose-500/10 dark:text-rose-400"
-              >Remove collection</button>
+              <button @click="removeCollection(collection.id)" class="btn btn-danger-ghost btn-xs">Remove collection</button>
             </div>
           </section>
         </template>
@@ -384,7 +339,7 @@
       </main>
 
       <!-- Footer -->
-      <footer class="border-t border-slate-200 px-6 py-2.5 text-center text-xs text-slate-500 dark:border-slate-800">
+      <footer class="border-t border-(--border-default) px-6 py-2.5 text-center text-xs text-(--text-muted)">
         Prompt Enhancer — runs entirely in your browser · all data stays in local storage
       </footer>
     </div>

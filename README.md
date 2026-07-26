@@ -1,5 +1,7 @@
 # Prompt Enhancer
 
+**Live:** https://sadeghhp.github.io/prompt-enhancer/
+
 A browser-only prompt-enhancement app. No backend — every provider call goes
 straight from your browser to the LLM API, and all data (sessions, prompt
 versions, providers, API keys, settings) lives in `localStorage`.
@@ -35,3 +37,17 @@ anywhere (or open via `npm run preview`).
 
 The provider must allow CORS requests from the browser (OpenAI, OpenRouter,
 Groq, Mistral, and local servers all do).
+
+> **Note:** API keys are stored only in your browser's `localStorage` and are
+> sent directly from your browser to the provider you configure. Nothing is
+> ever sent to, or stored on, any server operated by this project.
+
+## Deploy
+
+Pushing to `main` builds and publishes the static site to GitHub Pages via
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). Enable it once
+under **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+## License
+
+[MIT](LICENSE)

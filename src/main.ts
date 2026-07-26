@@ -41,7 +41,7 @@ function newColumn(settings: ColumnSettings, overrides: Partial<PromptColumn> = 
     settings: cloneSettings(settings),
     createdAt: Date.now(),
     producedBy: '',
-    showAdvanced: true,
+    showAdvanced: false,
     ...overrides,
   }
 }
@@ -113,6 +113,8 @@ Alpine.data('mainApp', () => ({
   activeId: '' as string,
   enhancing: false,
   error: '',
+  copiedId: '' as string,
+  _copiedTimer: 0 as ReturnType<typeof setTimeout> | 0,
   theme: loadTheme(),
 
   toggleTheme() {
@@ -324,8 +326,39 @@ Alpine.data('mainApp', () => ({
     }
   },
 
-  copyColumn(col: PromptColumn) {
-    void navigator.clipboard.writeText(col.text)
+  /**
+   * Copy a single column's prompt text to the system clipboard. Prefers the
+   * async Clipboard API and falls back to a hidden-textarea + execCommand copy
+   * for insecure contexts (e.g. plain http://) and older browsers that lack it.
+   * Feedback lives in `copiedId` — separate from the column so showing "Copied!"
+   * never touches `col.text` and can't re-render the editor content.
+   */
+  async copyColumn(col: PromptColumn) {
+    const text = col.text
+    try {
+      if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        ta.setAttribute('readonly', '')
+        ta.style.position = 'fixed'
+        ta.style.top = '-9999px'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(ta)
+        if (!ok) throw new Error('copy command was rejected')
+      }
+      this.copiedId = col.id
+      clearTimeout(this._copiedTimer)
+      this._copiedTimer = setTimeout(() => {
+        this.copiedId = ''
+      }, 1500)
+    } catch {
+      this.error = 'Could not copy to the clipboard.'
+    }
   },
 
   formatDate(ts: number): string {

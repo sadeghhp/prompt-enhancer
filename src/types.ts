@@ -12,6 +12,8 @@ export interface Provider {
   baseUrl: string
   apiKey: string
   models: LlmModel[]
+  /** LlmModel.id of the model preselected for new columns of this provider */
+  defaultModelId?: string
 }
 
 export interface EnhanceOptions {

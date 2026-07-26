@@ -115,19 +115,124 @@
 
             <!-- Models -->
             <div class="mt-4 border-t border-slate-200 pt-4 dark:border-slate-800">
-              <div class="mb-2 flex items-center justify-between">
+              <div class="mb-2 flex items-center justify-between gap-2">
                 <h3 class="text-sm font-medium text-slate-900 dark:text-white">Models</h3>
-                <button
-                  @click="addModel(provider)"
-                  class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                >+ Add model</button>
+                <div class="flex items-center gap-2">
+                  <button
+                    @click="openModelPicker(provider)"
+                    :disabled="pickers[provider.id]?.status === 'loading'"
+                    class="rounded-lg bg-indigo-600/10 px-2.5 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-600/20 disabled:opacity-50 dark:bg-indigo-500/15 dark:text-indigo-300 dark:hover:bg-indigo-500/25"
+                    x-text="pickers[provider.id]?.status === 'loading' ? 'Fetching…' : '⟳ Fetch models'"
+                  ></button>
+                  <button
+                    @click="addModel(provider)"
+                    class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                  >+ Add manually</button>
+                </div>
               </div>
-              <p x-show="provider.models.length === 0" class="text-xs text-slate-500">
-                No models yet — add the model IDs you want to use (e.g. gpt-4o-mini).
+
+              <!-- Fetch & pick models panel -->
+              <template x-if="pickers[provider.id]">
+                <div class="mb-3 rounded-xl border border-indigo-200 bg-indigo-50/50 p-3 dark:border-indigo-500/30 dark:bg-indigo-500/5">
+                  <template x-if="pickers[provider.id].status !== 'ready'">
+                    <div class="flex items-center justify-between gap-2">
+                      <span
+                        class="text-xs"
+                        :class="pickers[provider.id].status === 'error'
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-slate-500 dark:text-slate-400'"
+                        x-text="pickers[provider.id].message"
+                      ></span>
+                      <div class="flex shrink-0 gap-2">
+                        <button
+                          x-show="pickers[provider.id].status === 'error'"
+                          @click="openModelPicker(provider)"
+                          class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >Retry</button>
+                        <button
+                          @click="closeModelPicker(provider.id)"
+                          class="rounded-lg px-2.5 py-1 text-xs text-slate-500 transition hover:bg-slate-200 dark:hover:bg-slate-800"
+                        >Close</button>
+                      </div>
+                    </div>
+                  </template>
+                  <template x-if="pickers[provider.id].status === 'ready'">
+                    <div>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <input
+                          type="text"
+                          x-model="pickers[provider.id].filter"
+                          @input="pickers[provider.id].limit = 200"
+                          placeholder="Filter models… (e.g. gpt mini)"
+                          class="w-64 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                        />
+                        <button
+                          @click="selectAllFiltered(pickers[provider.id])"
+                          title="Select every model matching the current filter"
+                          class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >Select all</button>
+                        <button
+                          @click="clearPickerSelection(pickers[provider.id])"
+                          class="rounded-lg border border-slate-300 px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >Clear selection</button>
+                        <span
+                          class="ml-auto text-xs text-slate-500 dark:text-slate-400"
+                          x-text="`${pickerSelectedCount(pickers[provider.id])} selected · ${filteredPickerModels(pickers[provider.id]).length} of ${pickers[provider.id].available.length} match`"
+                        ></span>
+                      </div>
+                      <ul class="mt-2 max-h-64 overflow-y-auto rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                        <template x-for="m in visiblePickerModels(pickers[provider.id])" :key="m">
+                          <li>
+                            <label class="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-xs text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">
+                              <input
+                                type="checkbox"
+                                x-model="pickers[provider.id].selected[m]"
+                                class="size-3.5 accent-indigo-600"
+                              />
+                              <span class="truncate font-mono" x-text="m" :title="m"></span>
+                            </label>
+                          </li>
+                        </template>
+                        <li
+                          x-show="filteredPickerModels(pickers[provider.id]).length === 0"
+                          class="px-3 py-2 text-xs text-slate-500"
+                        >No models match this filter.</li>
+                      </ul>
+                      <button
+                        x-show="filteredPickerModels(pickers[provider.id]).length > pickers[provider.id].limit"
+                        @click="pickers[provider.id].limit += 200"
+                        class="mt-1.5 w-full rounded-lg border border-dashed border-slate-300 py-1 text-xs text-slate-500 transition hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                        x-text="`Show more (${filteredPickerModels(pickers[provider.id]).length - pickers[provider.id].limit} hidden)`"
+                      ></button>
+                      <div class="mt-2 flex items-center justify-end gap-2">
+                        <button
+                          @click="closeModelPicker(provider.id)"
+                          class="rounded-lg px-3 py-1.5 text-xs text-slate-500 transition hover:bg-slate-200 dark:hover:bg-slate-800"
+                        >Cancel</button>
+                        <button
+                          @click="applyModelSelection(provider)"
+                          class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500"
+                          x-text="`Use ${pickerSelectedCount(pickers[provider.id])} selected models`"
+                        ></button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+
+              <p x-show="provider.models.length === 0 && !pickers[provider.id]" class="text-xs text-slate-500">
+                No models yet — fetch the provider's model list, or add model IDs manually (e.g. gpt-4o-mini).
               </p>
               <ul class="space-y-2">
                 <template x-for="model in provider.models" :key="model.id">
                   <li class="flex flex-wrap items-center gap-2 rounded-xl bg-slate-100 p-2.5 dark:bg-slate-800/60">
+                    <button
+                      @click="setDefaultModel(provider, model.id)"
+                      :title="provider.defaultModelId === model.id ? 'Default model — click to unset' : 'Set as default model for this provider'"
+                      class="rounded-lg px-1.5 py-1 text-sm transition hover:bg-slate-200 dark:hover:bg-slate-700"
+                      :class="provider.defaultModelId === model.id ? 'text-amber-500' : 'text-slate-400 dark:text-slate-500'"
+                      x-text="provider.defaultModelId === model.id ? '★' : '☆'"
+                    ></button>
                     <input
                       type="text" x-model="model.modelId" @change="persist()" placeholder="Model ID, e.g. gpt-4o-mini"
                       class="w-56 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-white"

@@ -32,6 +32,40 @@ export async function testProvider(provider: Provider): Promise<TestResult> {
   }
 }
 
+export interface FetchModelsResult {
+  ok: boolean
+  message: string
+  /** Model ID strings as reported by the provider, deduplicated and sorted */
+  models: string[]
+}
+
+/** List the model IDs the provider exposes via its /models endpoint. */
+export async function fetchProviderModels(provider: Provider): Promise<FetchModelsResult> {
+  try {
+    const res = await fetch(`${normalizeBaseUrl(provider.baseUrl)}/models`, {
+      headers: authHeaders(provider),
+    })
+    if (!res.ok) {
+      return { ok: false, message: `HTTP ${res.status}: ${await safeError(res)}`, models: [] }
+    }
+    const data = await res.json()
+    const raw: unknown[] = Array.isArray(data?.data) ? data.data : []
+    const ids = [
+      ...new Set(
+        raw
+          .map((m) => (m as { id?: unknown })?.id)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0),
+      ),
+    ].sort((a, b) => a.localeCompare(b))
+    if (ids.length === 0) {
+      return { ok: false, message: 'The provider returned no models.', models: [] }
+    }
+    return { ok: true, message: `${ids.length} models available`, models: ids }
+  } catch (err) {
+    return { ok: false, message: describeNetworkError(err), models: [] }
+  }
+}
+
 /** Verify a specific model responds by requesting a minimal completion. */
 export async function testModel(provider: Provider, modelId: string): Promise<TestResult> {
   try {

@@ -1,5 +1,5 @@
 import Alpine from 'alpinejs'
-import { testModel, testProvider } from './api'
+import { fetchProviderModels, testModel, testProvider } from './api'
 import { storage } from './storage'
 import { applyTheme, loadTheme, saveTheme } from './theme'
 import { uid } from './types'
@@ -10,11 +10,32 @@ interface TestState {
   message: string
 }
 
+/**
+ * Transient state of the "fetch & pick models" panel for one provider.
+ * Kept out of localStorage on purpose: only the applied selection is
+ * persisted, so a provider with thousands of models doesn't bloat storage.
+ */
+interface ModelPicker {
+  status: 'loading' | 'error' | 'ready'
+  message: string
+  /** Fetched model IDs plus any modelIds already configured on the provider */
+  available: string[]
+  selected: Record<string, boolean>
+  filter: string
+  /** How many filtered rows are rendered; grown via "Show more" */
+  limit: number
+}
+
+/** Rows rendered per page in the picker, so huge lists stay responsive */
+const PICKER_PAGE = 200
+
 Alpine.data('settingsApp', () => ({
   providers: [] as Provider[],
   /** Test state keyed by provider id or `${providerId}:${modelId}` */
   tests: {} as Record<string, TestState>,
   revealedKeys: {} as Record<string, boolean>,
+  /** Model picker state keyed by provider id */
+  pickers: {} as Record<string, ModelPicker>,
   theme: loadTheme(),
 
   toggleTheme() {
@@ -54,6 +75,88 @@ Alpine.data('settingsApp', () => ({
 
   removeModel(provider: Provider, modelId: string) {
     provider.models = provider.models.filter((m) => m.id !== modelId)
+    if (provider.defaultModelId === modelId) delete provider.defaultModelId
+    this.persist()
+  },
+
+  setDefaultModel(provider: Provider, modelId: string) {
+    provider.defaultModelId = provider.defaultModelId === modelId ? undefined : modelId
+    this.persist()
+  },
+
+  async openModelPicker(provider: Provider) {
+    this.pickers[provider.id] = {
+      status: 'loading',
+      message: 'Fetching models…',
+      available: [],
+      selected: {},
+      filter: '',
+      limit: PICKER_PAGE,
+    }
+    const result = await fetchProviderModels(provider)
+    const picker = this.pickers[provider.id]
+    if (!picker) return // panel was closed while the request was in flight
+    if (!result.ok) {
+      picker.status = 'error'
+      picker.message = result.message
+      return
+    }
+    // Include already-configured models (e.g. manually added ones the
+    // provider doesn't list) so applying the selection never loses them.
+    const configured = provider.models.map((m) => m.modelId).filter(Boolean)
+    picker.available = [...new Set([...result.models, ...configured])].sort((a, b) =>
+      a.localeCompare(b),
+    )
+    for (const id of configured) picker.selected[id] = true
+    picker.status = 'ready'
+    picker.message = result.message
+  },
+
+  closeModelPicker(providerId: string) {
+    delete this.pickers[providerId]
+  },
+
+  filteredPickerModels(picker: ModelPicker): string[] {
+    const terms = picker.filter.toLowerCase().split(/\s+/).filter(Boolean)
+    if (terms.length === 0) return picker.available
+    return picker.available.filter((id) => {
+      const lower = id.toLowerCase()
+      return terms.every((t) => lower.includes(t))
+    })
+  },
+
+  visiblePickerModels(picker: ModelPicker): string[] {
+    return this.filteredPickerModels(picker).slice(0, picker.limit)
+  },
+
+  pickerSelectedCount(picker: ModelPicker): number {
+    return Object.values(picker.selected).filter(Boolean).length
+  },
+
+  /** Select every model matching the current filter (not just visible rows). */
+  selectAllFiltered(picker: ModelPicker) {
+    for (const id of this.filteredPickerModels(picker)) picker.selected[id] = true
+  },
+
+  clearPickerSelection(picker: ModelPicker) {
+    picker.selected = {}
+  },
+
+  /**
+   * Replace the provider's model list with the picker selection, reusing
+   * existing entries (and their labels/default flag) for models that stay.
+   */
+  applyModelSelection(provider: Provider) {
+    const picker = this.pickers[provider.id]
+    if (!picker) return
+    const existing = new Map(provider.models.map((m) => [m.modelId, m]))
+    provider.models = picker.available
+      .filter((id) => picker.selected[id])
+      .map((modelId) => existing.get(modelId) ?? { id: uid(), modelId, label: '' })
+    if (!provider.models.some((m) => m.id === provider.defaultModelId)) {
+      delete provider.defaultModelId
+    }
+    this.closeModelPicker(provider.id)
     this.persist()
   },
 

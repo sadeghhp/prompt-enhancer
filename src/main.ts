@@ -5,11 +5,17 @@ import { applyTheme, loadTheme, saveTheme } from './theme'
 import { DEFAULT_OPTIONS, uid } from './types'
 import type { ColumnSettings, PromptColumn, Provider, Session } from './types'
 
+/** The provider's configured default model, falling back to its first model. */
+function defaultModelFor(provider: Provider | undefined) {
+  if (!provider) return undefined
+  return provider.models.find((m) => m.id === provider.defaultModelId) ?? provider.models[0]
+}
+
 function defaultSettings(providers: Provider[]): ColumnSettings {
   const provider = providers[0]
   return {
     providerId: provider?.id ?? '',
-    modelId: provider?.models[0]?.id ?? '',
+    modelId: defaultModelFor(provider)?.id ?? '',
     outputLanguage: 'English',
     options: { ...DEFAULT_OPTIONS },
   }
@@ -180,7 +186,7 @@ Alpine.data('mainApp', () => ({
   },
 
   onProviderChange(col: PromptColumn) {
-    col.settings.modelId = this.modelsFor(col)[0]?.id ?? ''
+    col.settings.modelId = defaultModelFor(this.providerFor(col))?.id ?? ''
     this.persist()
   },
 

@@ -40,8 +40,10 @@ export async function testModel(provider: Provider, modelId: string): Promise<Te
       headers: authHeaders(provider),
       body: JSON.stringify({
         model: modelId,
+        // No max_tokens / temperature: newer OpenAI models reject max_tokens
+        // (they require max_completion_tokens) and o-series reject custom
+        // temperature — omitting both keeps the test provider-agnostic.
         messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
-        max_tokens: 5,
       }),
     })
     if (!res.ok) {
@@ -89,7 +91,6 @@ export async function enhancePrompt(
         { role: 'system', content: buildSystemPrompt(options, outputLanguage) },
         { role: 'user', content: prompt },
       ],
-      temperature: 0.3,
     }),
   })
   if (!res.ok) {

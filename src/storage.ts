@@ -16,7 +16,11 @@ function load<T>(key: string, fallback: T): T {
 }
 
 function save(key: string, value: unknown): void {
-  localStorage.setItem(key, JSON.stringify(value))
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch (err) {
+    console.warn(`Failed to persist ${key} (storage full or unavailable):`, err)
+  }
 }
 
 export const storage = {

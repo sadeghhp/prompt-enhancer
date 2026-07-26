@@ -81,12 +81,19 @@ Alpine.data('mainApp', () => ({
     storage.saveActiveSession(this.activeId)
   },
 
-  touch() {
-    this.session.updatedAt = Date.now()
-    if (this.session.draft.trim()) {
-      const firstLine = this.session.draft.trim().split('\n')[0]
-      this.session.title = firstLine.length > 42 ? `${firstLine.slice(0, 42)}…` : firstLine
+  touch(target?: Session) {
+    const session = target ?? this.session
+    session.updatedAt = Date.now()
+    if (session.draft.trim()) {
+      const firstLine = session.draft.trim().split('\n')[0]
+      session.title = firstLine.length > 42 ? `${firstLine.slice(0, 42)}…` : firstLine
     }
+    this.persist()
+  },
+
+  /** Persist edits made to an enhanced version's text. */
+  touchVersion() {
+    this.session.updatedAt = Date.now()
     this.persist()
   },
 
@@ -104,6 +111,7 @@ Alpine.data('mainApp', () => ({
   },
 
   deleteSession(id: string) {
+    if (!confirm('Delete this session and all its prompt versions?')) return
     this.sessions = this.sessions.filter((s) => s.id !== id)
     if (this.sessions.length === 0) this.sessions.push(newSession(this.providers))
     if (this.activeId === id) this.openSession(this.sessions[0].id)
@@ -115,16 +123,14 @@ Alpine.data('mainApp', () => ({
     this.persist()
   },
 
-  modelLabel(): string {
-    const m = this.activeModels.find((m) => m.id === this.session.settings.modelId)
-    return m ? `${this.activeProvider?.name} / ${m.label}` : ''
-  },
-
   /** Enhance the middle-column draft, or re-enhance an edited version. */
   async enhance(sourceText?: string) {
-    const text = (sourceText ?? this.session.draft).trim()
+    // Capture the session up front: `this.session` is a getter, and the user
+    // may switch sessions while the request is in flight.
+    const session = this.session
+    const text = (sourceText ?? session.draft).trim()
     const provider = this.activeProvider
-    const model = this.activeModels.find((m) => m.id === this.session.settings.modelId)
+    const model = provider?.models.find((m) => m.id === session.settings.modelId)
     if (!text || !provider || !model || this.enhancing) return
 
     this.enhancing = true
@@ -134,20 +140,23 @@ Alpine.data('mainApp', () => ({
         provider,
         model.modelId,
         text,
-        this.session.settings.options,
-        this.session.settings.outputLanguage,
+        session.settings.options,
+        session.settings.outputLanguage,
       )
-      this.session.versions.push({
+      session.versions.push({
         id: uid(),
         text: enhanced,
         createdAt: Date.now(),
-        model: `${provider.name} / ${model.label}`,
+        model: `${provider.name} / ${model.label || model.modelId}`,
       })
-      this.touch()
-      // Let the new card render, then slide to it.
-      requestAnimationFrame(() => {
-        this.versionIndex = this.session.versions.length - 1
-      })
+      this.touch(session)
+      // Let the new card render, then slide to it — unless the user has
+      // navigated to a different session in the meantime.
+      if (this.activeId === session.id) {
+        requestAnimationFrame(() => {
+          this.versionIndex = session.versions.length - 1
+        })
+      }
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err)
     } finally {

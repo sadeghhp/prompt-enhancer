@@ -45,8 +45,18 @@ Groq, Mistral, and local servers all do).
 ## Deploy
 
 Pushing to `main` builds and publishes the static site to GitHub Pages via
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). Enable it once
-under **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+
+**One-time setup** (repo admin):
+
+1. Open **Settings → Pages**.
+2. Under **Build and deployment**, set **Source** to **GitHub Actions** (not
+   “Deploy from a branch”).
+3. Push to `main` or re-run the **Deploy to GitHub Pages** workflow from the
+   **Actions** tab.
+
+The site is served at `https://<owner>.github.io/prompt-enhancer/`. Vite uses a
+relative `base` (`./`) so assets and navigation work under that subpath.
 
 ## License
 

@@ -35,8 +35,8 @@
         </nav>
       </header>
 
-      <!-- Main: three columns -->
-      <main class="grid min-h-0 flex-1 grid-cols-[16rem_1fr_1fr] gap-4 p-4">
+      <!-- Main: sessions sidebar + enhancement chain -->
+      <main class="grid min-h-0 flex-1 grid-cols-[16rem_1fr] gap-4 p-4">
         <!-- Left: sessions -->
         <aside class="flex min-h-0 flex-col rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
           <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
@@ -58,7 +58,7 @@
                     <span class="block truncate text-sm" :class="s.id === activeId ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'" x-text="s.title"></span>
                     <span class="mt-0.5 block text-xs text-slate-500">
                       <span x-text="formatDate(s.updatedAt)"></span>
-                      · <span x-text="s.versions.length"></span>v
+                      · <span x-text="s.chain.length"></span> links
                     </span>
                   </span>
                   <span
@@ -72,198 +72,178 @@
           </ul>
         </aside>
 
-        <!-- Middle: editor -->
-        <section class="flex min-h-0 flex-col gap-3">
-          <!-- Advanced settings -->
-          <div class="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
-            <button @click="showAdvanced = !showAdvanced" class="flex w-full items-center justify-between px-4 py-3">
-              <span class="text-sm font-semibold text-slate-900 dark:text-white">Advanced settings</span>
-              <span class="text-xs text-slate-500 dark:text-slate-400" x-text="showAdvanced ? '▲' : '▼'"></span>
-            </button>
-            <div x-show="showAdvanced" class="space-y-3 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
-              <template x-if="providers.length === 0">
-                <p class="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                  No providers configured yet —
-                  <a href="/settings.html" class="underline hover:text-amber-800 dark:hover:text-amber-200">add one in Settings</a>.
-                </p>
-              </template>
-              <div class="grid grid-cols-3 gap-3">
-                <label class="block">
-                  <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Provider</span>
-                  <select
-                    x-model="session.settings.providerId"
-                    @change="onProviderChange()"
-                    class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  >
-                    <option value="" disabled>Select…</option>
-                    <template x-for="p in providers" :key="p.id">
-                      <option :value="p.id" x-text="p.name"></option>
-                    </template>
-                  </select>
-                </label>
-                <label class="block">
-                  <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Target model</span>
-                  <select
-                    x-model="session.settings.modelId"
-                    @change="persist()"
-                    class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  >
-                    <option value="" disabled>Select…</option>
-                    <template x-for="m in activeModels" :key="m.id">
-                      <option :value="m.id" x-text="m.label || m.modelId"></option>
-                    </template>
-                  </select>
-                </label>
-                <label class="block">
-                  <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Output language</span>
-                  <input
-                    type="text"
-                    x-model="session.settings.outputLanguage"
-                    @change="persist()"
-                    list="languages"
-                    placeholder="English"
-                    class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  />
-                  <datalist id="languages">
-                    <option>English</option><option>Persian</option><option>German</option>
-                    <option>French</option><option>Spanish</option><option>Arabic</option>
-                    <option>Chinese</option><option>Japanese</option>
-                  </datalist>
-                </label>
-              </div>
-              <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600 dark:text-slate-300">
-                <label class="flex cursor-pointer items-center gap-1.5">
-                  <input type="checkbox" x-model="session.settings.options.clarity" @change="persist()" class="accent-indigo-500" /> Clarity
-                </label>
-                <label class="flex cursor-pointer items-center gap-1.5">
-                  <input type="checkbox" x-model="session.settings.options.structure" @change="persist()" class="accent-indigo-500" /> Structure
-                </label>
-                <label class="flex cursor-pointer items-center gap-1.5">
-                  <input type="checkbox" x-model="session.settings.options.bestPractices" @change="persist()" class="accent-indigo-500" /> Best practices
-                </label>
-                <label class="flex cursor-pointer items-center gap-1.5">
-                  <input type="checkbox" x-model="session.settings.options.tokenEfficiency" @change="persist()" class="accent-indigo-500" /> Token efficiency
-                </label>
-                <label class="flex cursor-pointer items-center gap-1.5">
-                  <input type="checkbox" x-model="session.settings.options.preserveIntent" @change="persist()" class="accent-indigo-500" /> Preserve intent
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <!-- Draft textarea -->
-          <div class="flex min-h-0 flex-1 flex-col rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
-            <div class="border-b border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-900 dark:border-slate-800 dark:text-white">Your prompt</div>
-            <textarea
-              x-model="session.draft"
-              @input="touch()"
-              placeholder="Write or paste the prompt you want to enhance — any language works."
-              class="min-h-0 flex-1 resize-none bg-transparent p-4 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-100 dark:placeholder:text-slate-600"
-            ></textarea>
-          </div>
-
-          <!-- Enhancement instruction -->
-          <div class="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
-            <div class="flex items-baseline justify-between border-b border-slate-200 px-4 py-2.5 dark:border-slate-800">
-              <span class="text-sm font-semibold text-slate-900 dark:text-white">Instruction <span class="font-normal text-slate-400 dark:text-slate-500">(optional)</span></span>
-              <span class="text-xs text-slate-500 dark:text-slate-400">guides the enhancement without changing your prompt</span>
-            </div>
-            <textarea
-              x-model="session.instruction"
-              @input="persist()"
-              rows="2"
-              placeholder="e.g. Make it more formal · Turn it into a step-by-step task · Add an output format section"
-              class="w-full resize-none bg-transparent p-4 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-100 dark:placeholder:text-slate-600"
-            ></textarea>
-          </div>
-
-          <p x-show="error" x-cloak class="rounded-xl bg-rose-500/10 px-4 py-2.5 text-sm text-rose-700 dark:text-rose-300" x-text="error"></p>
-
-          <button
-            @click="enhance()"
-            :disabled="!canEnhance"
-            class="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <span x-show="!enhancing">✨ Enhance</span>
-            <span x-show="enhancing" x-cloak class="flex items-center gap-2">
-              <span class="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
-              Enhancing…
-            </span>
-          </button>
-        </section>
-
-        <!-- Right: enhanced versions -->
-        <section class="flex min-h-0 flex-col rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
-          <div class="flex items-center justify-between border-b border-slate-200 px-4 py-2.5 dark:border-slate-800">
-            <h2 class="text-sm font-semibold text-slate-900 dark:text-white">Enhanced prompt</h2>
-            <span
-              x-show="session.versions.length > 0"
-              class="rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-xs font-medium text-indigo-600 dark:text-indigo-300"
-              x-text="`v${versionIndex + 1} of ${session.versions.length}`"
-            ></span>
-          </div>
-
-          <template x-if="session.versions.length === 0">
-            <div class="grid flex-1 place-items-center p-6 text-center text-sm text-slate-500">
-              <p>Enhanced versions will appear here.<br />Each enhancement creates a new version you can edit and enhance again.</p>
-            </div>
+        <!-- Right: enhancement chain — every column is one link with its own settings -->
+        <section class="flex min-h-0 flex-col">
+          <template x-if="providers.length === 0">
+            <p class="mb-3 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              No providers configured yet —
+              <a href="/settings.html" class="underline hover:text-amber-800 dark:hover:text-amber-200">add one in Settings</a>.
+            </p>
           </template>
 
-          <template x-if="session.versions.length > 0">
-            <div class="flex min-h-0 flex-1 flex-col">
-              <!-- Sliding carousel -->
-              <div class="min-h-0 flex-1 overflow-hidden">
-                <div class="version-track h-full" :style="`transform: translateX(-${versionIndex * 100}%)`">
-                  <template x-for="(v, i) in session.versions" :key="v.id">
-                    <div class="version-card flex h-full flex-col p-3" :data-hidden="i !== versionIndex">
-                      <div class="mb-2 flex items-center justify-between text-xs text-slate-500">
-                        <span x-text="`v${i + 1} · ${v.model}`"></span>
-                        <span x-text="formatDate(v.createdAt)"></span>
+          <!-- Two-column sliding viewport -->
+          <div class="min-h-0 flex-1 overflow-hidden">
+            <div class="chain-track h-full" :style="`transform: translateX(-${session.viewIndex * 50}%)`">
+              <template x-for="(col, i) in session.chain" :key="col.id">
+                <div
+                  class="chain-card flex h-full flex-col gap-3 px-1.5"
+                  :data-hidden="i < session.viewIndex || i > session.viewIndex + 1"
+                >
+                  <!-- Column header -->
+                  <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900/50">
+                    <span class="flex min-w-0 items-center gap-2">
+                      <span class="rounded-full bg-indigo-500/15 px-2.5 py-0.5 text-xs font-semibold text-indigo-600 dark:text-indigo-300" x-text="i === 0 ? 'Prompt 1' : `Prompt ${i + 1}`"></span>
+                      <span class="truncate text-xs text-slate-500" x-text="col.producedBy ? `enhanced by ${col.producedBy}` : 'original'"></span>
+                    </span>
+                    <span class="flex shrink-0 items-center gap-2 text-xs text-slate-500">
+                      <span x-text="formatDate(col.createdAt)"></span>
+                      <button
+                        @click="copyColumn(col)"
+                        class="rounded-lg border border-slate-300 px-2 py-1 text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                      >Copy</button>
+                    </span>
+                  </div>
+
+                  <!-- Advanced settings (independent per column) -->
+                  <div class="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
+                    <button @click="col.showAdvanced = !col.showAdvanced; persist()" class="flex w-full items-center justify-between px-4 py-2.5">
+                      <span class="text-sm font-semibold text-slate-900 dark:text-white">Advanced settings</span>
+                      <span class="text-xs text-slate-500 dark:text-slate-400" x-text="col.showAdvanced ? '▲' : '▼'"></span>
+                    </button>
+                    <div x-show="col.showAdvanced" class="space-y-3 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+                      <div class="grid grid-cols-3 gap-3">
+                        <label class="block">
+                          <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Provider</span>
+                          <select
+                            x-model="col.settings.providerId"
+                            x-effect="$nextTick(() => { $el.value = col.settings.providerId })"
+                            @change="onProviderChange(col)"
+                            class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                          >
+                            <option value="" disabled>Select…</option>
+                            <template x-for="p in providers" :key="p.id">
+                              <option :value="p.id" x-text="p.name"></option>
+                            </template>
+                          </select>
+                        </label>
+                        <label class="block">
+                          <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Target model</span>
+                          <select
+                            x-model="col.settings.modelId"
+                            x-effect="$nextTick(() => { $el.value = col.settings.modelId })"
+                            @change="persist()"
+                            class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                          >
+                            <option value="" disabled>Select…</option>
+                            <template x-for="m in modelsFor(col)" :key="m.id">
+                              <option :value="m.id" x-text="m.label || m.modelId"></option>
+                            </template>
+                          </select>
+                        </label>
+                        <label class="block">
+                          <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Output language</span>
+                          <input
+                            type="text"
+                            x-model="col.settings.outputLanguage"
+                            @change="persist()"
+                            list="languages"
+                            placeholder="English"
+                            class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                          />
+                        </label>
                       </div>
-                      <textarea
-                        x-model="v.text"
-                        @input="touchVersion()"
-                        class="min-h-0 flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-900 focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-100"
-                      ></textarea>
+                      <div class="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600 dark:text-slate-300">
+                        <label class="flex cursor-pointer items-center gap-1.5">
+                          <input type="checkbox" x-model="col.settings.options.clarity" @change="persist()" class="accent-indigo-500" /> Clarity
+                        </label>
+                        <label class="flex cursor-pointer items-center gap-1.5">
+                          <input type="checkbox" x-model="col.settings.options.structure" @change="persist()" class="accent-indigo-500" /> Structure
+                        </label>
+                        <label class="flex cursor-pointer items-center gap-1.5">
+                          <input type="checkbox" x-model="col.settings.options.bestPractices" @change="persist()" class="accent-indigo-500" /> Best practices
+                        </label>
+                        <label class="flex cursor-pointer items-center gap-1.5">
+                          <input type="checkbox" x-model="col.settings.options.tokenEfficiency" @change="persist()" class="accent-indigo-500" /> Token efficiency
+                        </label>
+                        <label class="flex cursor-pointer items-center gap-1.5">
+                          <input type="checkbox" x-model="col.settings.options.preserveIntent" @change="persist()" class="accent-indigo-500" /> Preserve intent
+                        </label>
+                      </div>
                     </div>
-                  </template>
-                </div>
-              </div>
+                  </div>
 
-              <!-- Version navigation + actions -->
-              <div class="flex items-center justify-between gap-2 border-t border-slate-200 p-3 dark:border-slate-800">
-                <div class="flex items-center gap-1.5">
+                  <!-- Editable prompt text -->
+                  <div class="flex min-h-0 flex-1 flex-col rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
+                    <div class="border-b border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-900 dark:border-slate-800 dark:text-white" x-text="i === 0 ? 'Your prompt' : 'Enhanced prompt'"></div>
+                    <textarea
+                      x-model="col.text"
+                      @input="touch()"
+                      :placeholder="i === 0 ? 'Write or paste the prompt you want to enhance — any language works.' : 'The enhanced prompt appears here — edit it freely before the next enhancement.'"
+                      class="min-h-0 flex-1 resize-none bg-transparent p-4 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-100 dark:placeholder:text-slate-600"
+                    ></textarea>
+                  </div>
+
+                  <!-- Enhancement instruction (independent per column) -->
+                  <div class="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/50">
+                    <div class="flex items-baseline justify-between border-b border-slate-200 px-4 py-2 dark:border-slate-800">
+                      <span class="text-sm font-semibold text-slate-900 dark:text-white">Instruction <span class="font-normal text-slate-400 dark:text-slate-500">(optional)</span></span>
+                      <span class="text-xs text-slate-500 dark:text-slate-400">guides this column's enhancement</span>
+                    </div>
+                    <textarea
+                      x-model="col.instruction"
+                      @input="persist()"
+                      rows="2"
+                      placeholder="e.g. Make it more formal · Turn it into a step-by-step task"
+                      class="w-full resize-none bg-transparent px-4 py-3 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-100 dark:placeholder:text-slate-600"
+                    ></textarea>
+                  </div>
+
+                  <!-- Enhance: generates the next link in the chain -->
                   <button
-                    @click="prevVersion()"
-                    :disabled="versionIndex === 0"
-                    title="Previous version"
-                    class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >←</button>
-                  <button
-                    @click="nextVersion()"
-                    :disabled="versionIndex >= session.versions.length - 1"
-                    title="Next version"
-                    class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >→</button>
+                    @click="enhanceFrom(i)"
+                    :disabled="!canEnhance(col)"
+                    class="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <span x-show="!enhancing">✨ Enhance → next column</span>
+                    <span x-show="enhancing" x-cloak class="flex items-center gap-2">
+                      <span class="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
+                      Enhancing…
+                    </span>
+                  </button>
                 </div>
-                <div class="flex items-center gap-1.5">
-                  <button
-                    @click="copyVersion()"
-                    class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >Copy</button>
-                  <button
-                    @click="useVersionAsDraft()"
-                    class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-600 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                  >Use as draft</button>
-                  <button
-                    @click="enhanceCurrentVersion()"
-                    :disabled="enhancing || !activeProvider"
-                    class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
-                  >✨ Enhance again</button>
-                </div>
-              </div>
+              </template>
             </div>
-          </template>
+          </div>
+
+          <p x-show="error" x-cloak class="mt-3 rounded-xl bg-rose-500/10 px-4 py-2.5 text-sm text-rose-700 dark:text-rose-300" x-text="error"></p>
+
+          <!-- Chain navigation -->
+          <div class="mt-3 flex items-center justify-center gap-3">
+            <button
+              @click="prevView()"
+              :disabled="session.viewIndex === 0"
+              title="Earlier links in the chain"
+              class="rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >←</button>
+            <span
+              class="text-xs text-slate-500 dark:text-slate-400"
+              x-text="session.chain.length === 1
+                ? '1 link in chain'
+                : `Showing ${session.viewIndex + 1}–${Math.min(session.viewIndex + 2, session.chain.length)} of ${session.chain.length} links`"
+            ></span>
+            <button
+              @click="nextView()"
+              :disabled="session.viewIndex >= maxViewIndex"
+              title="Later links in the chain"
+              class="rounded-lg border border-slate-300 px-4 py-1.5 text-sm text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >→</button>
+          </div>
+
+          <datalist id="languages">
+            <option>English</option><option>Persian</option><option>German</option>
+            <option>French</option><option>Spanish</option><option>Arabic</option>
+            <option>Chinese</option><option>Japanese</option>
+          </datalist>
         </section>
       </main>
 

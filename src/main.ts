@@ -3,15 +3,32 @@ import { enhancePrompt } from './api'
 import { storage } from './storage'
 import { applyTheme, loadTheme, saveTheme } from './theme'
 import { DEFAULT_OPTIONS, uid } from './types'
-import type { Provider, Session, SessionSettings } from './types'
+import type { ColumnSettings, PromptColumn, Provider, Session } from './types'
 
-function defaultSettings(providers: Provider[]): SessionSettings {
+function defaultSettings(providers: Provider[]): ColumnSettings {
   const provider = providers[0]
   return {
     providerId: provider?.id ?? '',
     modelId: provider?.models[0]?.id ?? '',
     outputLanguage: 'English',
     options: { ...DEFAULT_OPTIONS },
+  }
+}
+
+function cloneSettings(settings: ColumnSettings): ColumnSettings {
+  return JSON.parse(JSON.stringify(settings)) as ColumnSettings
+}
+
+function newColumn(settings: ColumnSettings, overrides: Partial<PromptColumn> = {}): PromptColumn {
+  return {
+    id: uid(),
+    text: '',
+    instruction: '',
+    settings: cloneSettings(settings),
+    createdAt: Date.now(),
+    producedBy: '',
+    showAdvanced: true,
+    ...overrides,
   }
 }
 
@@ -22,21 +39,60 @@ function newSession(providers: Provider[]): Session {
     title: 'New session',
     createdAt: now,
     updatedAt: now,
-    draft: '',
-    instruction: '',
-    versions: [],
-    settings: defaultSettings(providers),
+    chain: [newColumn(defaultSettings(providers))],
+    viewIndex: 0,
   }
+}
+
+/** Convert sessions saved with the old draft/versions shape into a chain. */
+function migrateSession(s: Session, providers: Provider[]): void {
+  if (Array.isArray(s.chain) && s.chain.length > 0) {
+    // Fill fields added after the chain feature shipped
+    for (const col of s.chain) {
+      col.instruction ??= ''
+      col.producedBy ??= ''
+      col.showAdvanced ??= false
+    }
+    s.viewIndex = clampView(s.viewIndex ?? 0, s.chain.length)
+    return
+  }
+  const settings = s.settings ?? defaultSettings(providers)
+  const chain: PromptColumn[] = [
+    newColumn(settings, {
+      text: s.draft ?? '',
+      instruction: s.instruction ?? '',
+      createdAt: s.createdAt,
+    }),
+  ]
+  for (const v of s.versions ?? []) {
+    chain.push(
+      newColumn(settings, {
+        id: v.id,
+        text: v.text,
+        createdAt: v.createdAt,
+        producedBy: v.model,
+        showAdvanced: false,
+      }),
+    )
+  }
+  s.chain = chain
+  s.viewIndex = clampView(chain.length - 1, chain.length)
+  delete s.draft
+  delete s.instruction
+  delete s.versions
+  delete s.settings
+}
+
+function clampView(index: number, chainLength: number): number {
+  return Math.min(Math.max(0, index), Math.max(0, chainLength - 2))
 }
 
 Alpine.data('mainApp', () => ({
   providers: [] as Provider[],
   sessions: [] as Session[],
   activeId: '' as string,
-  versionIndex: 0,
   enhancing: false,
   error: '',
-  showAdvanced: true,
   theme: loadTheme(),
 
   toggleTheme() {
@@ -48,8 +104,7 @@ Alpine.data('mainApp', () => ({
   init() {
     this.providers = storage.loadProviders()
     this.sessions = storage.loadSessions()
-    // Sessions saved before the instruction feature existed lack the field
-    for (const s of this.sessions) s.instruction ??= ''
+    for (const s of this.sessions) migrateSession(s, this.providers)
     if (this.sessions.length === 0) {
       this.sessions.push(newSession(this.providers))
     }
@@ -58,7 +113,6 @@ Alpine.data('mainApp', () => ({
       savedActive && this.sessions.some((s) => s.id === savedActive)
         ? savedActive
         : this.sessions[0].id
-    this.versionIndex = Math.max(0, this.session.versions.length - 1)
     this.persist()
   },
 
@@ -70,21 +124,9 @@ Alpine.data('mainApp', () => ({
     return [...this.sessions].sort((a, b) => b.updatedAt - a.updatedAt)
   },
 
-  get activeProvider(): Provider | undefined {
-    return this.providers.find((p) => p.id === this.session.settings.providerId)
-  },
-
-  get activeModels() {
-    return this.activeProvider?.models ?? []
-  },
-
-  get canEnhance(): boolean {
-    return Boolean(
-      !this.enhancing &&
-        this.activeProvider &&
-        this.session.settings.modelId &&
-        this.session.draft.trim(),
-    )
+  /** Highest allowed viewIndex: the last two columns fill the viewport. */
+  get maxViewIndex(): number {
+    return Math.max(0, this.session.chain.length - 2)
   },
 
   persist() {
@@ -92,19 +134,28 @@ Alpine.data('mainApp', () => ({
     storage.saveActiveSession(this.activeId)
   },
 
+  providerFor(col: PromptColumn): Provider | undefined {
+    return this.providers.find((p) => p.id === col.settings.providerId)
+  },
+
+  modelsFor(col: PromptColumn) {
+    return this.providerFor(col)?.models ?? []
+  },
+
+  canEnhance(col: PromptColumn): boolean {
+    return Boolean(
+      !this.enhancing && this.providerFor(col) && col.settings.modelId && col.text.trim(),
+    )
+  },
+
   touch(target?: Session) {
     const session = target ?? this.session
     session.updatedAt = Date.now()
-    if (session.draft.trim()) {
-      const firstLine = session.draft.trim().split('\n')[0]
+    const first = session.chain[0]?.text.trim()
+    if (first) {
+      const firstLine = first.split('\n')[0]
       session.title = firstLine.length > 42 ? `${firstLine.slice(0, 42)}…` : firstLine
     }
-    this.persist()
-  },
-
-  /** Persist edits made to an enhanced version's text. */
-  touchVersion() {
-    this.session.updatedAt = Date.now()
     this.persist()
   },
 
@@ -117,51 +168,59 @@ Alpine.data('mainApp', () => ({
   openSession(id: string) {
     this.activeId = id
     this.error = ''
-    this.versionIndex = Math.max(0, this.session.versions.length - 1)
     this.persist()
   },
 
   deleteSession(id: string) {
-    if (!confirm('Delete this session and all its prompt versions?')) return
+    if (!confirm('Delete this session and its entire enhancement chain?')) return
     this.sessions = this.sessions.filter((s) => s.id !== id)
     if (this.sessions.length === 0) this.sessions.push(newSession(this.providers))
     if (this.activeId === id) this.openSession(this.sessions[0].id)
     this.persist()
   },
 
-  onProviderChange() {
-    this.session.settings.modelId = this.activeModels[0]?.id ?? ''
+  onProviderChange(col: PromptColumn) {
+    col.settings.modelId = this.modelsFor(col)[0]?.id ?? ''
     this.persist()
   },
 
-  /** Enhance the middle-column draft, or re-enhance an edited version. */
-  async enhance(sourceText?: string) {
+  /**
+   * Enhance the chain link at `index` using only that column's settings,
+   * instruction, and text. The result becomes the next column, which starts
+   * with an independent copy of the source column's configuration. Any links
+   * after the source are replaced — they were derived from the old output.
+   */
+  async enhanceFrom(index: number) {
     // Capture the session up front: `this.session` is a getter, and the user
     // may switch sessions while the request is in flight.
     const session = this.session
-    const text = (sourceText ?? session.draft).trim()
-    const provider = this.activeProvider
-    const model = provider?.models.find((m) => m.id === session.settings.modelId)
-    if (!text || !provider || !model || this.enhancing) return
+    const source = session.chain[index]
+    if (!source || this.enhancing) return
+    const text = source.text.trim()
+    const provider = this.providerFor(source)
+    const model = provider?.models.find((m) => m.id === source.settings.modelId)
+    if (!text || !provider || !model) return
 
     this.enhancing = true
     this.error = ''
-    // Create the version card up front and stream tokens into it so the
+    session.chain.splice(index + 1)
+    // Create the next link up front and stream tokens into it so the
     // response appears in real time.
-    session.versions.push({
-      id: uid(),
-      text: '',
-      createdAt: Date.now(),
-      model: `${provider.name} / ${model.label || model.modelId}`,
-    })
-    // Re-read through the session proxy so writes to `version.text` below are
+    session.chain.push(
+      newColumn(source.settings, {
+        instruction: source.instruction,
+        producedBy: `${provider.name} / ${model.label || model.modelId}`,
+        showAdvanced: source.showAdvanced,
+      }),
+    )
+    // Re-read through the session proxy so writes to `target.text` below are
     // reactive — mutating the raw pushed object would not update the UI.
-    const version = session.versions[session.versions.length - 1]
-    // Let the new card render, then slide to it — unless the user has
-    // navigated to a different session in the meantime.
+    const target = session.chain[session.chain.length - 1]
+    // Let the new column render, then slide the chain one position left so
+    // the source and the new link fill the viewport.
     if (this.activeId === session.id) {
       requestAnimationFrame(() => {
-        this.versionIndex = session.versions.length - 1
+        session.viewIndex = clampView(index, session.chain.length)
       })
     }
     try {
@@ -169,51 +228,44 @@ Alpine.data('mainApp', () => ({
         provider,
         model.modelId,
         text,
-        session.settings.options,
-        session.settings.outputLanguage,
-        session.instruction,
+        source.settings.options,
+        source.settings.outputLanguage,
+        source.instruction,
         (_chunk, fullText) => {
-          version.text = fullText
+          target.text = fullText
         },
       )
-      version.text = enhanced
+      target.text = enhanced
       this.touch(session)
     } catch (err) {
-      // Drop the placeholder card so a failed request leaves no empty version.
-      session.versions = session.versions.filter((v) => v.id !== version.id)
-      if (this.activeId === session.id) {
-        this.versionIndex = Math.min(this.versionIndex, Math.max(0, session.versions.length - 1))
-      }
+      // Drop the placeholder so a failed request leaves no empty link.
+      session.chain = session.chain.filter((c) => c.id !== target.id)
+      session.viewIndex = clampView(session.viewIndex, session.chain.length)
       this.error = err instanceof Error ? err.message : String(err)
+      this.persist()
     } finally {
       this.enhancing = false
     }
   },
 
-  enhanceCurrentVersion() {
-    const current = this.session.versions[this.versionIndex]
-    if (current) void this.enhance(current.text)
-  },
-
-  prevVersion() {
-    if (this.versionIndex > 0) this.versionIndex--
-  },
-
-  nextVersion() {
-    if (this.versionIndex < this.session.versions.length - 1) this.versionIndex++
-  },
-
-  useVersionAsDraft() {
-    const current = this.session.versions[this.versionIndex]
-    if (current) {
-      this.session.draft = current.text
-      this.touch()
+  prevView() {
+    const session = this.session
+    if (session.viewIndex > 0) {
+      session.viewIndex--
+      this.persist()
     }
   },
 
-  copyVersion() {
-    const current = this.session.versions[this.versionIndex]
-    if (current) void navigator.clipboard.writeText(current.text)
+  nextView() {
+    const session = this.session
+    if (session.viewIndex < this.maxViewIndex) {
+      session.viewIndex++
+      this.persist()
+    }
+  },
+
+  copyColumn(col: PromptColumn) {
+    void navigator.clipboard.writeText(col.text)
   },
 
   formatDate(ts: number): string {

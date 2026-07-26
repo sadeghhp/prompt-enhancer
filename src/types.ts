@@ -22,19 +22,30 @@ export interface EnhanceOptions {
   preserveIntent: boolean
 }
 
-export interface SessionSettings {
+export interface ColumnSettings {
   providerId: string
   modelId: string
   outputLanguage: string
   options: EnhanceOptions
 }
 
-export interface PromptVersion {
+/**
+ * One link in the enhancement chain. Every column has the same shape:
+ * its own settings, its own instruction, and its own editable prompt text.
+ * Enhancing a column produces the next column in the chain.
+ */
+export interface PromptColumn {
   id: string
+  /** Editable prompt text of this link */
   text: string
+  /** Instruction guiding the enhancement that this column will produce */
+  instruction: string
+  settings: ColumnSettings
   createdAt: number
-  /** Model used to produce this version; empty for the original draft */
-  model: string
+  /** Provider/model that generated this column's text; empty for the first link */
+  producedBy: string
+  /** UI state: whether this column's advanced settings panel is expanded */
+  showAdvanced: boolean
 }
 
 export interface Session {
@@ -42,13 +53,15 @@ export interface Session {
   title: string
   createdAt: number
   updatedAt: number
-  /** The prompt being edited in the middle column */
-  draft: string
-  /** Optional user instruction guiding how the prompt should be enhanced */
+  /** The enhancement chain, oldest link first. Always has at least one column. */
+  chain: PromptColumn[]
+  /** Index of the leftmost column in the two-column viewport */
+  viewIndex: number
+  /* Legacy fields from the pre-chain data model; migrated on load */
+  draft?: string
   instruction?: string
-  /** Enhanced versions, oldest first */
-  versions: PromptVersion[]
-  settings: SessionSettings
+  versions?: { id: string; text: string; createdAt: number; model: string }[]
+  settings?: ColumnSettings
 }
 
 export const DEFAULT_OPTIONS: EnhanceOptions = {

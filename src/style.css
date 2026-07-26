@@ -7,20 +7,22 @@
   display: none !important;
 }
 
-/* Version carousel: track slides horizontally, one card per version */
-.version-track {
+/* Enhancement chain: the track slides horizontally, two columns visible at a
+   time. Cards are 50% of the viewport, so each viewIndex step is a 50% shift. */
+.chain-track {
   display: flex;
   transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.version-card {
-  flex: 0 0 100%;
+.chain-card {
+  flex: 0 0 50%;
   min-width: 0;
   transition: opacity 0.45s ease, transform 0.45s ease;
 }
 
-.version-card[data-hidden='true'] {
-  opacity: 0.15;
-  transform: scale(0.96);
+/* Off-screen links fade out as they slide behind the history column */
+.chain-card[data-hidden='true'] {
+  opacity: 0.1;
+  transform: scale(0.97);
   pointer-events: none;
 }

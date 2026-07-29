@@ -1,5 +1,6 @@
 import Alpine from 'alpinejs'
 import { fetchProviderModels, testModel, testProvider } from './api'
+import { renderBuildInfo } from './build-info'
 import { storage } from './storage'
 import { applyTheme, loadTheme, saveTheme } from './theme'
 import { BEST_PRACTICE_KINDS, OUTPUT_FORMATS, TARGET_PLATFORMS, factoryDefaults, uid } from './types'
@@ -236,3 +237,4 @@ Alpine.data('settingsApp', () => ({
 }))
 
 Alpine.start()
+renderBuildInfo()

@@ -221,7 +221,10 @@
                         <line x1="21" y1="17" x2="16" y2="17" /><line x1="12" y1="17" x2="3" y2="17" />
                         <line x1="14" y1="5" x2="14" y2="9" /><line x1="16" y1="15" x2="16" y2="19" />
                       </svg>
-                      <span class="text-sm font-semibold text-(--text-primary)">Advanced settings</span>
+                      <span class="text-sm font-semibold text-(--text-primary)">
+                        Advanced settings
+                        <span class="font-normal text-(--text-muted)">for <span class="font-semibold text-(--accent-text) tabular-nums" x-text="`v${i + 2}`"></span></span>
+                      </span>
                       <span class="min-w-0 flex-1 truncate text-right text-xs text-(--text-muted)" x-text="advancedSummary(col)"></span>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5 shrink-0 text-(--text-muted) transition-transform duration-200 motion-reduce:transition-none" :class="col.showAdvanced ? 'rotate-180' : ''" aria-hidden="true">
                         <path d="m6 9 6 6 6-6" />
@@ -309,8 +312,14 @@
                         class="advanced-panel"
                       >
                         <div class="flex items-center justify-between gap-2 border-b border-(--border-default) px-3 py-2">
-                          <span class="text-sm font-semibold text-(--text-primary)">Advanced settings</span>
-                          <button @click="closeAdvanced(col)" class="btn btn-soft btn-xs">Done</button>
+                          <span class="min-w-0 flex-1">
+                            <span class="block truncate text-sm font-semibold text-(--text-primary)">
+                              Advanced settings
+                              <span class="font-normal text-(--text-muted)">for <span class="font-semibold text-(--accent-text) tabular-nums" x-text="`v${i + 2}`"></span></span>
+                            </span>
+                            <span class="block truncate text-xs text-(--text-muted)" x-text="`These control the next enhancement, not v${i + 1} itself.`"></span>
+                          </span>
+                          <button @click="closeAdvanced(col)" class="btn btn-soft btn-xs shrink-0">Done</button>
                         </div>
                         <div class="advanced-panel-body space-y-2.5 px-3 py-2.5">
                           <div class="grid grid-cols-2 gap-2 @lg:grid-cols-3">
@@ -383,7 +392,7 @@
                             <label class="flex cursor-pointer items-center gap-1.5">
                               <input type="checkbox" x-model="col.settings.options.preserveIntent" @change="persist()" class="checkbox" /> Preserve intent
                             </label>
-                            <label class="flex cursor-pointer items-center gap-1.5" title="Force a tight rewrite — brevity, efficiency, and clarity — without weakening the prompt">
+                            <label class="flex cursor-pointer items-center gap-1.5" title="Hard cap: the enhanced prompt must be no longer than the original. Supersedes Token efficiency.">
                               <input type="checkbox" x-model="col.settings.options.brevity" @change="persist()" class="checkbox" /> Brevity
                             </label>
                             <label class="flex cursor-pointer items-center gap-1.5" title="Append a short explanation of the changes after the enhanced prompt">
@@ -431,7 +440,11 @@
                                 />
                               </label>
                             </div>
-                            <div class="mt-2">
+                            <!-- The "Best practices" option above is the master
+                                 switch: with it off, selected collections are
+                                 not sent, so the list is disabled and says so
+                                 rather than silently dropping the selection. -->
+                            <div class="mt-2" :class="col.settings.options.bestPractices ? '' : 'opacity-40'">
                               <span class="field-label">Best-practice collections</span>
                               <template x-if="bestPractices.length === 0">
                                 <p class="text-xs text-(--text-faint)">
@@ -441,10 +454,15 @@
                               </template>
                               <div class="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-(--text-secondary)">
                                 <template x-for="bp in bestPractices" :key="bp.id">
-                                  <label class="flex cursor-pointer items-center gap-1.5" :title="bp.target ? `For ${bp.target}` : ''">
+                                  <label
+                                    class="flex items-center gap-1.5"
+                                    :class="col.settings.options.bestPractices ? 'cursor-pointer' : 'cursor-not-allowed'"
+                                    :title="bp.target ? `For ${bp.target}` : ''"
+                                  >
                                     <input
                                       type="checkbox"
                                       :checked="isPracticeSelected(col, bp.id)"
+                                      :disabled="!col.settings.options.bestPractices"
                                       @change="togglePractice(col, bp.id)"
                                       class="checkbox"
                                     />
@@ -454,6 +472,12 @@
                                 </template>
                               </div>
                             </div>
+                            <p
+                              x-show="!col.settings.options.bestPractices && selectedPracticeCount(col) > 0"
+                              x-cloak
+                              class="mt-2 rounded-(--radius-md) bg-(--warning-soft) px-2 py-1.5 text-xs text-(--warning)"
+                              x-text="`${selectedPracticeCount(col)} collection${selectedPracticeCount(col) === 1 ? '' : 's'} selected but not applied — turn on the “Best practices” option above to use ${selectedPracticeCount(col) === 1 ? 'it' : 'them'}.`"
+                            ></p>
                           </div>
                         </div>
                       </div>

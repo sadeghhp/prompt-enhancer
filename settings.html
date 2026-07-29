@@ -291,7 +291,7 @@
               <label class="flex cursor-pointer items-center gap-1.5">
                 <input type="checkbox" x-model="defaults.options.preserveIntent" @change="persistDefaults()" class="checkbox" /> Preserve intent
               </label>
-              <label class="flex cursor-pointer items-center gap-1.5" title="Force a tight rewrite — brevity, efficiency, and clarity — without weakening the prompt">
+              <label class="flex cursor-pointer items-center gap-1.5" title="Hard cap: the enhanced prompt must be no longer than the original. Supersedes Token efficiency.">
                 <input type="checkbox" x-model="defaults.options.brevity" @change="persistDefaults()" class="checkbox" /> Brevity
               </label>
               <label class="flex cursor-pointer items-center gap-1.5" title="Append a short explanation of the changes after the enhanced prompt">

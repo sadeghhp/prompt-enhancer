@@ -90,7 +90,11 @@ export interface EnhanceOptions {
   bestPractices: boolean
   tokenEfficiency: boolean
   preserveIntent: boolean
-  /** Force a tight rewrite: brevity, efficiency, and clarity, without weakening the prompt */
+  /**
+   * The strong form of `tokenEfficiency`: caps the rewrite at the original's
+   * length or shorter. Supersedes `tokenEfficiency` when both are set, so the
+   * two never issue competing length rules.
+   */
   brevity: boolean
   /** Append a short "Commentary" section explaining the changes made */
   commentary: boolean

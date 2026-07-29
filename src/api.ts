@@ -163,40 +163,100 @@ function describeOutputFormat(format: OutputFormat | undefined): string {
   }
 }
 
+/**
+ * Every toggle is bidirectional: the OFF branch states the opposite
+ * constraint rather than staying silent. A silent OFF would change nothing,
+ * because the "expert prompt engineer" framing already implies clarity,
+ * structure, best practices, and intent preservation — the model would apply
+ * them anyway and the toggle would have no visible effect.
+ */
+function describeGoals(options: EnhanceOptions): string[] {
+  const goals = ['Fix grammar, spelling, and awkward phrasing.']
+
+  goals.push(
+    options.clarity
+      ? 'Maximize clarity and remove ambiguity: name the actor, the deliverable, and the success criteria explicitly.'
+      : "Do not chase clarity for its own sake — keep the user's wording, terminology, and level of detail as written, and leave ambiguity that the user may have left deliberately.",
+  )
+  goals.push(
+    options.structure
+      ? 'Give the prompt a clean structure (role, task, context, constraints, output format) when it helps.'
+      : 'Keep the prompt\'s existing shape: do NOT add headings, sections, numbered steps, or bullet lists that the original did not already have. If the original is one paragraph, the rewrite is one paragraph.',
+  )
+  goals.push(
+    options.bestPractices
+      ? 'Apply prompt-engineering best practices: explicit instructions, concrete constraints, and a clearly specified output format.'
+      : 'Do NOT add prompt-engineering scaffolding of your own — no invented role/persona line, no constraint list, no output-format section, no examples — unless the original prompt already asked for it.',
+  )
+  goals.push(
+    options.preserveIntent
+      ? 'Preserve the original intent, requirements, and all factual details exactly. Never add requirements the user did not state.'
+      : 'You are not bound to the original wording or scope: reframe, sharpen, or broaden the request where that yields a materially stronger prompt, and add the requirements a good version of this request would include.',
+  )
+
+  // Brevity is the strong form of token efficiency. When it is on it fully
+  // supersedes that toggle, so the two never issue competing length rules.
+  if (options.brevity) {
+    goals.push(
+      'Compress hard. The enhanced prompt MUST be no longer than the original — aim for noticeably shorter. Use the fewest words that fully express it, cut every redundancy, and prefer short declarative sentences over prose — while keeping its specificity and instructional strength fully intact.',
+    )
+  } else {
+    goals.push(
+      options.tokenEfficiency
+        ? 'Be concise — cut filler and redundancy to reduce token usage without losing meaning or quality.'
+        : 'Length is not a constraint: do not compress the prompt. Where extra context, background, or worked detail makes the instruction more complete and less ambiguous, spell it out.',
+    )
+  }
+  return goals
+}
+
+/**
+ * The closing output contract. Emitted as the LAST lines of the system prompt
+ * so it wins any conflict, and made format-aware: telling the model "no code
+ * fences" while also asking for Markdown or JSON is contradictory, and models
+ * resolve that by dropping the formatting — which is why the output-format
+ * choice used to look like it had no effect.
+ */
+function describeOutputContract(options: EnhanceOptions, format: OutputFormat | undefined): string[] {
+  const formatted = Boolean(format) && format !== 'plain'
+  if (options.commentary) {
+    return format === 'json'
+      ? [
+          'Return ONLY that JSON object — no preamble and no text outside it. Include one extra top-level field "commentary" whose value briefly explains the key changes you made and why.',
+        ]
+      : [
+          'After the enhanced prompt, add a section titled "Commentary" that briefly explains the key changes you made and why. Separate it with a "---" divider so the prompt above it stays copy-pasteable on its own.',
+          'Output nothing else: no preamble before the prompt, and nothing after the Commentary section.',
+        ]
+  }
+  return [
+    formatted
+      ? 'Return ONLY the enhanced prompt itself — no preamble, no explanation, no surrounding quotes, and no code fence wrapped around the whole response (fences *inside* the prompt are fine where the format calls for them).'
+      : 'Return ONLY the enhanced prompt text — no preamble, no explanations, no surrounding quotes or code fences.',
+  ]
+}
+
 function buildSystemPrompt(ctx: EnhanceContext): string {
   const { options, outputLanguage, outputFormat, instruction } = ctx
-  const goals: string[] = ['Fix grammar, spelling, and awkward phrasing.']
-  if (options.clarity) goals.push('Maximize clarity and remove ambiguity.')
-  if (options.structure) goals.push('Give the prompt a clean structure (role, task, context, constraints, output format) when it helps.')
-  if (options.bestPractices) goals.push('Apply prompt-engineering best practices: explicit instructions, concrete constraints, and a clearly specified output format.')
-  if (options.tokenEfficiency) goals.push('Be concise — cut filler and redundancy to reduce token usage without losing meaning or quality.')
-  if (options.preserveIntent) goals.push('Preserve the original intent, requirements, and all factual details exactly.')
-  if (options.brevity) goals.push('Rewrite for brevity, efficiency, and clarity: use the fewest words and tokens that fully express the prompt, cutting every redundancy — while keeping its quality, specificity, and instructional strength fully intact.')
 
   const lines = [
     'You are an expert prompt engineer. Rewrite the prompt the user gives you into a higher-quality prompt for an LLM or AI agent.',
-    ...goals.map((g) => `- ${g}`),
+    'Follow these rules exactly — they are the user\'s explicit choices, including the ones that tell you NOT to do something you would normally do:',
+    ...describeGoals(options).map((g) => `- ${g}`),
     ...describeTarget(ctx.target),
     ...describeBestPractices(ctx.bestPractices),
     `Write the enhanced prompt in ${outputLanguage || 'English'}, regardless of the input language.`,
   ]
-  const formatLine = describeOutputFormat(outputFormat)
-  if (formatLine) lines.push(formatLine)
   if (instruction?.trim()) {
     lines.push(
       'The user also gave this instruction about how to enhance the prompt. It takes priority over the goals above — apply it faithfully, and treat it as guidance for the rewrite, NOT as content to answer or to insert verbatim:',
       `"""${instruction.trim()}"""`,
     )
   }
-  // Commentary is off by default: return only the prompt. When on, allow a
-  // clearly separated explanation of the changes after the prompt itself.
-  if (options.commentary) {
-    lines.push(
-      'After the enhanced prompt, add a section titled "Commentary" that briefly explains the key changes you made and why. Separate it clearly from the prompt (e.g. a "---" divider) so the prompt itself stays copy-pasteable.',
-    )
-  } else {
-    lines.push('Return ONLY the enhanced prompt text — no preamble, no explanations, no surrounding quotes or code fences.')
-  }
+  // Format and delivery rules come last so they override anything above.
+  const formatLine = describeOutputFormat(outputFormat)
+  if (formatLine) lines.push(formatLine)
+  lines.push(...describeOutputContract(options, outputFormat))
   return lines.join('\n')
 }
 

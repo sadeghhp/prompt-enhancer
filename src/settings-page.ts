@@ -1,7 +1,7 @@
 import Alpine from 'alpinejs'
 import { fetchProviderModels, testModel, testProvider } from './api'
 import { renderBuildInfo } from './build-info'
-import { storage } from './storage'
+import { STORAGE_ERROR_MESSAGE, storage } from './storage'
 import { applyTheme, loadTheme, saveTheme } from './theme'
 import { BEST_PRACTICE_KINDS, OUTPUT_FORMATS, TARGET_PLATFORMS, factoryDefaults, uid } from './types'
 import type { BestPracticeCollection, DefaultSettings, Provider } from './types'
@@ -43,6 +43,8 @@ Alpine.data('settingsApp', () => ({
   /** Model picker state keyed by provider id */
   pickers: {} as Record<string, ModelPicker>,
   theme: loadTheme(),
+  /** Set when a write to localStorage fails; shown as a persistent banner */
+  storageError: '',
 
   toggleTheme() {
     this.theme = this.theme === 'dark' ? 'light' : 'dark'
@@ -56,12 +58,17 @@ Alpine.data('settingsApp', () => ({
     this.defaults = storage.loadDefaults()
   },
 
+  /** Record the outcome of a write so a full/blocked storage is never silent. */
+  noteSave(ok: boolean) {
+    this.storageError = ok ? '' : STORAGE_ERROR_MESSAGE
+  },
+
   persist() {
-    storage.saveProviders(this.providers)
+    this.noteSave(storage.saveProviders(Alpine.raw(this.providers)))
   },
 
   persistDefaults() {
-    storage.saveDefaults(this.defaults)
+    this.noteSave(storage.saveDefaults(Alpine.raw(this.defaults)))
   },
 
   /** Reset the enhancement defaults back to the out-of-the-box values. */
@@ -71,7 +78,7 @@ Alpine.data('settingsApp', () => ({
   },
 
   persistPractices() {
-    storage.saveBestPractices(this.bestPractices)
+    this.noteSave(storage.saveBestPractices(Alpine.raw(this.bestPractices)))
   },
 
   addCollection() {

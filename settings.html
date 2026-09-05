@@ -35,6 +35,15 @@
         </nav>
       </header>
 
+      <!-- Storage failure notice: stays up until a later save succeeds -->
+      <p
+        x-show="storageError"
+        x-cloak
+        role="alert"
+        class="mx-4 mt-4 rounded-(--radius-md) bg-(--danger-soft) px-4 py-2.5 text-sm text-(--danger) sm:mx-6"
+        x-text="storageError"
+      ></p>
+
       <main class="mx-auto w-full max-w-4xl flex-1 space-y-4 p-4 sm:p-6">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>

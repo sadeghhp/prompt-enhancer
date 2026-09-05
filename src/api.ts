@@ -263,41 +263,100 @@ function buildSystemPrompt(ctx: EnhanceContext): string {
 /** Which part of the response a streamed chunk belongs to. */
 export type DeltaKind = 'content' | 'reasoning'
 
+/** Thrown when the caller aborts an enhancement via its AbortSignal. */
+export class EnhanceCancelledError extends Error {
+  constructor() {
+    super('Enhancement cancelled.')
+    this.name = 'EnhanceCancelledError'
+  }
+}
+
+/** Time allowed for the provider to return response headers. */
+const CONNECT_TIMEOUT_MS = 30_000
+/** Time allowed between two streamed chunks (or for a non-streamed body). */
+const IDLE_TIMEOUT_MS = 90_000
+
+/**
+ * Stream one enhancement. `signal` lets the caller cancel; independently, a
+ * connect timeout and an idle timeout abort a provider that accepts the
+ * request but never (or no longer) responds, so the app can't be locked in
+ * an "enhancing" state forever. Timeouts surface as a plain Error with a
+ * readable message; a caller-initiated abort surfaces as
+ * EnhanceCancelledError so the UI can stay silent about it.
+ */
 export async function enhancePrompt(
   provider: Provider,
   modelId: string,
   prompt: string,
   context: EnhanceContext,
   onDelta?: (chunk: string, fullText: string, kind: DeltaKind) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
-  const res = await fetch(`${normalizeBaseUrl(provider.baseUrl)}/chat/completions`, {
-    method: 'POST',
-    headers: authHeaders(provider),
-    body: JSON.stringify({
-      model: modelId,
-      stream: true,
-      messages: [
-        { role: 'system', content: buildSystemPrompt(context) },
-        { role: 'user', content: prompt },
-      ],
-    }),
-  })
-  if (!res.ok) {
-    throw new Error(`Provider error (HTTP ${res.status}): ${await safeError(res)}`)
+  // One internal controller so the caller's Cancel and both timeouts share a
+  // single abort path into fetch() and the stream reader.
+  const ctrl = new AbortController()
+  let timeoutMs = 0
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const arm = (ms: number) => {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      timeoutMs = ms
+      ctrl.abort()
+    }, ms)
   }
-  let text: string
-  if (res.headers.get('content-type')?.includes('text/event-stream')) {
-    text = await readSseStream(res, onDelta)
-  } else {
-    const data = await res.json()
-    const reasoning = extractCompletionReasoning(data)
-    if (reasoning) onDelta?.(reasoning, '', 'reasoning')
-    text = extractCompletionText(data)
+  const disarm = () => clearTimeout(timer)
+  const onExternalAbort = () => ctrl.abort()
+  if (signal?.aborted) throw new EnhanceCancelledError()
+  signal?.addEventListener('abort', onExternalAbort, { once: true })
+
+  try {
+    arm(CONNECT_TIMEOUT_MS)
+    const res = await fetch(`${normalizeBaseUrl(provider.baseUrl)}/chat/completions`, {
+      method: 'POST',
+      headers: authHeaders(provider),
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        model: modelId,
+        stream: true,
+        messages: [
+          { role: 'system', content: buildSystemPrompt(context) },
+          { role: 'user', content: prompt },
+        ],
+      }),
+    })
+    disarm()
+    if (!res.ok) {
+      throw new Error(`Provider error (HTTP ${res.status}): ${await safeError(res)}`)
+    }
+    let text: string
+    if (res.headers.get('content-type')?.includes('text/event-stream')) {
+      text = await readSseStream(res, onDelta, () => arm(IDLE_TIMEOUT_MS))
+    } else {
+      arm(IDLE_TIMEOUT_MS)
+      const data = await res.json()
+      disarm()
+      const reasoning = extractCompletionReasoning(data)
+      if (reasoning) onDelta?.(reasoning, '', 'reasoning')
+      text = extractCompletionText(data)
+    }
+    if (!text.trim()) {
+      throw new Error('The model returned an empty response.')
+    }
+    return text.trim()
+  } catch (err) {
+    if (ctrl.signal.aborted) {
+      if (timeoutMs) {
+        throw new Error(
+          `The provider stopped responding for ${Math.round(timeoutMs / 1000)} seconds. Check the model and base URL, then try again.`,
+        )
+      }
+      throw new EnhanceCancelledError()
+    }
+    throw err
+  } finally {
+    disarm()
+    signal?.removeEventListener('abort', onExternalAbort)
   }
-  if (!text.trim()) {
-    throw new Error('The model returned an empty response.')
-  }
-  return text.trim()
 }
 
 /** Some providers ignore `stream: true` and return plain JSON — handle both. */
@@ -313,9 +372,16 @@ function extractCompletionReasoning(data: unknown): string {
   return typeof reasoning === 'string' ? reasoning : ''
 }
 
+/**
+ * Parse an OpenAI-style SSE body. `onChunk` fires before the first read and
+ * after every subsequent one so the caller can keep an idle timer armed.
+ * On any failure the reader is cancelled so the connection is released
+ * instead of lingering until garbage collection.
+ */
 async function readSseStream(
   res: Response,
   onDelta?: (chunk: string, fullText: string, kind: DeltaKind) => void,
+  onChunk?: () => void,
 ): Promise<string> {
   if (!res.body) throw new Error('The provider response has no body to stream.')
   const reader = res.body.getReader()
@@ -349,17 +415,24 @@ async function readSseStream(
     }
   }
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-    for (const line of lines) handleLine(line.trim())
+  try {
+    onChunk?.()
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      onChunk?.()
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      for (const line of lines) handleLine(line.trim())
+    }
+    buffer += decoder.decode()
+    if (buffer.trim()) handleLine(buffer.trim())
+    return fullText
+  } catch (err) {
+    await reader.cancel().catch(() => {})
+    throw err
   }
-  buffer += decoder.decode()
-  if (buffer.trim()) handleLine(buffer.trim())
-  return fullText
 }
 
 async function safeError(res: Response): Promise<string> {

@@ -35,6 +35,15 @@
         </nav>
       </header>
 
+      <!-- Storage failure notice: stays up until a later save succeeds -->
+      <p
+        x-show="storageError"
+        x-cloak
+        role="alert"
+        class="mx-4 mt-4 rounded-(--radius-md) bg-(--danger-soft) px-4 py-2.5 text-sm text-(--danger) sm:mx-6"
+        x-text="storageError"
+      ></p>
+
       <!-- Main: sessions sidebar + enhancement chain + Markdown preview.
            The preview is a full-width strip below the chain on md, and the
            fourth column (its own grid track) on xl and up. -->
@@ -176,11 +185,20 @@
           <div class="min-h-0 min-w-0 flex-1 overflow-clip">
             <div class="chain-track h-full" :style="`--view-index: ${session.viewIndex}`">
               <template x-for="(col, i) in session.chain" :key="col.id">
+                <!-- Slot: always in the track so widths and positions hold for
+                     the whole chain. Its card is only mounted near the view
+                     window (see isMounted) — a column is ~70 directives, and
+                     rendering every link made session switches and slides
+                     slow on long chains. State lives in the data, so
+                     unmounting loses nothing but scroll position. -->
                 <div
                   @click="selectPreview(col)"
-                  class="chain-card @container flex h-full flex-col gap-2.5 px-1.5"
+                  class="chain-slot"
                   :data-past="i < session.viewIndex"
+                  :inert="i < session.viewIndex || i >= session.viewIndex + visibleColumns"
                 >
+                <template x-if="isMounted(i)">
+                <div class="chain-card @container flex h-full flex-col gap-2.5 px-1.5">
                   <!-- Column header: version badge + lineage + actions.
                        The accent ring marks the column shown in the preview. -->
                   <div class="card flex items-center gap-2.5 px-3 py-2" :class="previewColumn.id === col.id ? 'ring-1 ring-(--accent-ring)' : ''">
@@ -196,6 +214,15 @@
                     </span>
                     <span class="flex shrink-0 items-center gap-2 text-xs text-(--text-muted)">
                       <span class="hidden sm:inline" x-text="formatDate(col.createdAt)"></span>
+                      <!-- Cancel lives on the column being streamed into: on
+                           narrow screens the source column has already slid
+                           into the past (inert) by the time this is needed. -->
+                      <button
+                        x-show="enhancing?.targetId === col.id"
+                        x-cloak
+                        @click.stop="cancelEnhance()"
+                        class="btn btn-danger-ghost btn-xs"
+                      >Cancel</button>
                       <button
                         @click="copyColumn(col)"
                         :aria-label="copiedId === col.id ? 'Prompt copied to clipboard' : `Copy ${i === 0 ? 'original prompt' : 'enhanced prompt'} to clipboard`"
@@ -485,19 +512,25 @@
 
                     <!-- Enhance: generates the next link in the chain -->
                     <div class="flex shrink-0 justify-end">
+                      <!-- .stop: the column's own click handler would otherwise
+                           re-select this column for the preview, undoing
+                           enhanceFrom's switch to the newest link. -->
                       <button
-                        @click="enhanceFrom(i)"
+                        @click.stop="enhanceFrom(i)"
                         :disabled="!canEnhance(col)"
+                        :title="enhancing && enhancing.sourceId !== col.id ? 'Another enhancement is running' : ''"
                         class="btn btn-primary w-1/3 rounded-(--radius-md) px-3 py-2.5"
                       >
-                        <span x-show="!enhancing" class="truncate" x-text="`✨ Enhance → v${i + 2}`"></span>
-                        <span x-show="enhancing" x-cloak class="flex items-center gap-2">
+                        <span x-show="enhancing?.sourceId !== col.id" class="truncate" x-text="`✨ Enhance → v${i + 2}`"></span>
+                        <span x-show="enhancing?.sourceId === col.id" x-cloak class="flex items-center gap-2">
                           <span class="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></span>
                           Enhancing…
                         </span>
                       </button>
                     </div>
                   </div>
+                </div>
+                </template>
                 </div>
               </template>
             </div>

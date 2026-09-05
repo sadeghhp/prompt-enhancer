@@ -126,11 +126,14 @@ number = the column's 1-based position in the chain. Rules:
 - Desktop (`md:`+): `[16rem_1fr]` grid — sessions sidebar + chain viewport.
   Below `md`, single column; the sidebar caps at `max-h-48` and scrolls.
 - Chain: `.chain-track` slides horizontally by `--view-index` (set inline by
-  Alpine) × `--chain-step`. Desktop `--chain-step: 33.333%` (three columns
-  visible, so later links' Copy buttons stay reachable); below `lg` it is
-  `94%` (one column + a peek of the next). Change step sizes in CSS only —
-  the JS never encodes widths. `←`/`→` arrow keys also slide the chain
-  (listener in `main.ts`, skipped while typing in a field).
+  Alpine) × `--chain-step`. Default `--chain-step: 50%` (two columns: a
+  version and its enhancement side by side); from `1800px` it is `33.333%`
+  (three columns); below `lg` it is `94%` (one column + a peek of the next).
+  Widths live in CSS only, but `visibleColumnCount()` in `main.ts` mirrors
+  the same two breakpoints via `matchMedia` to clamp `viewIndex` — change
+  the CSS and the JS together. Columns outside the visible window get
+  `inert` so they leave the tab order. `←`/`→` arrow keys also slide the
+  chain (listener in `main.ts`, skipped while typing in a field).
 - `.chain-card` scrolls vertically at every width (`overflow-y: auto`,
   children `flex-shrink: 0`, editor min-height via `.chain-editor`) so no
   control is ever clipped and the page itself needs no vertical scrolling.
@@ -149,6 +152,14 @@ number = the column's 1-based position in the chain. Rules:
 
 - Keep business logic out of templates beyond Alpine bindings; state lives in
   `src/main.ts` / `src/settings-page.ts`.
-- `persist()` after every user-visible state change.
+- `persist()` after every user-visible state change. It is debounced
+  (250 ms trailing, flushed on `pagehide`/tab hide) because serializing every
+  session per keystroke was the main source of typing lag; use `persistNow()`
+  only for structural changes (create/open/delete/archive/pin/star). Pass raw
+  objects (`Alpine.raw`) to `storage.*`, never reactive proxies. Every
+  `storage.save*` returns a boolean — surface `false` via `storageError`.
+- Only one enhancement runs at a time (`enhancing: EnhanceRun | null`); it
+  is always cancellable (`cancelEnhance()`) and times out on its own, and a
+  failed or cancelled run restores the chain exactly as it was.
 - Session migration for older stored shapes happens in `migrateSession` —
   extend it when the stored schema changes.

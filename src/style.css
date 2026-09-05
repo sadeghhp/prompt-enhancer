@@ -478,15 +478,24 @@ body {
   transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Every link owns one slot in the track, so widths and positions hold for
+   the whole chain; the card inside is only mounted near the view window
+   (`isMounted` in main.ts). Slots carry the data-past fade and `inert`. */
+.chain-slot {
+  display: flex;
+  flex: 0 0 var(--chain-step);
+  min-width: 0;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
 /* Column content can exceed the viewport height at any width: scroll inside
    the column instead of the page, and keep the prompt editor comfortably
    tall. Future links stay fully visible/interactive — the viewport clips
    them; only links that slid into history fade out. */
 .chain-card {
-  flex: 0 0 var(--chain-step);
+  width: 100%;
   min-width: 0;
   overflow-y: auto;
-  transition: opacity 0.45s ease, transform 0.45s ease;
 }
 .chain-card > * {
   flex-shrink: 0;
@@ -504,7 +513,7 @@ body {
 }
 
 /* Links behind the leading column are history: faded and inert */
-.chain-card[data-past='true'] {
+.chain-slot[data-past='true'] {
   opacity: 0.15;
   transform: scale(0.97);
   pointer-events: none;

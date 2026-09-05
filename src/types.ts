@@ -204,3 +204,18 @@ export function factoryDefaults(): DefaultSettings {
 export function uid(): string {
   return crypto.randomUUID()
 }
+
+/**
+ * Upper bound on the chain-of-thought kept per column. Reasoning models can
+ * emit tens of KB per link and localStorage caps at ~5 MB per origin, so
+ * unbounded reasoning would eventually stop every save. The head is kept;
+ * prompt text itself is never trimmed.
+ */
+export const MAX_REASONING_CHARS = 20_000
+
+export const REASONING_TRUNCATED_MARKER = '\n\n… [reasoning truncated to save storage]'
+
+export function capReasoning(text: string): string {
+  if (text.length <= MAX_REASONING_CHARS) return text
+  return text.slice(0, MAX_REASONING_CHARS) + REASONING_TRUNCATED_MARKER
+}

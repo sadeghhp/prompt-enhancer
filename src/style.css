@@ -165,6 +165,23 @@ body {
     color: var(--text-muted);
   }
 
+  /* Icon-only controls in list rows (star, pin, archive, rename, delete):
+     real buttons so they sit in the tab order. Rows reveal them with
+     `hidden group-hover:inline-flex group-focus-within:inline-flex`, so they
+     take no width until the row is hovered or something in it has focus —
+     tabbing to the title button reveals them for keyboard users. */
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 0.25rem;
+    line-height: 1;
+  }
+  .btn-icon:focus-visible {
+    outline: none;
+    opacity: 1;
+    box-shadow: 0 0 0 3px var(--accent-ring);
+  }
+
   .checkbox {
     accent-color: var(--accent);
   }
@@ -466,6 +483,108 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
+   App frame: sessions sidebar | enhancement chain | Markdown preview.
+   Pane widths are custom properties so the drag handles (.resize-handle,
+   wired in main.ts) can override them inline; the defaults live here. Below
+   md everything stacks; from md the sidebar gets its own track and the
+   preview becomes a full-width strip under the chain; from xl the preview
+   is the third track. `main.ts` mirrors the xl breakpoint via matchMedia
+   (PREVIEW_COLUMN_QUERY) to know which panes share a row — change both.
+   Kept outside @layer so it beats the Tailwind utilities on the element.
+--------------------------------------------------------------------------- */
+.app-layout {
+  --sidebar-width: clamp(13.5rem, 14vw, 16rem);
+  --preview-width: clamp(20rem, 20vw, 26rem);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 768px) {
+  .app-layout {
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+}
+@media (min-width: 1280px) {
+  .app-layout {
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr) var(--preview-width);
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+/* Preview hidden (layout.previewCollapsed): the chain takes its track back
+   and, below xl, its row. Re-shown from the chain nav. */
+@media (min-width: 768px) {
+  .app-layout.app-layout-no-preview {
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+
+/* Drag handle: a 1rem-wide hit area that sits in the grid gap next to its
+   pane (the pane is position:relative), with a 2px bar down the middle that
+   only shows on hover, keyboard focus, or while dragging. Hidden until the
+   pane actually occupies its own column. */
+.resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+  display: none;
+  width: 1rem;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background-color 0.15s, box-shadow 0.15s;
+}
+.resize-handle:hover::before {
+  background: var(--border-strong);
+}
+.resize-handle.is-active::before {
+  background: var(--accent);
+}
+.resize-handle:focus-visible {
+  outline: none;
+}
+.resize-handle:focus-visible::before {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+/* Sidebar handle on its right edge (md+); preview handle on its left (xl+) */
+.resize-handle-end {
+  right: -1rem;
+}
+.resize-handle-start {
+  left: -1rem;
+}
+@media (min-width: 768px) {
+  .resize-handle-end {
+    display: block;
+  }
+}
+@media (min-width: 1280px) {
+  .resize-handle-start {
+    display: block;
+  }
+}
+/* While a drag is in progress the whole page reports the resize cursor and
+   text can't be selected by the sweeping pointer. */
+body.is-resizing,
+body.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+/* ---------------------------------------------------------------------------
    Enhancement chain: the track slides horizontally, three columns visible at
    a time on desktop. Each card is one --chain-step of the viewport, so each
    viewIndex step shifts the track by one --chain-step. The template sets
@@ -503,13 +622,28 @@ body {
 /* The editor group is the one column child allowed to shrink: it soaks up the
    space left by the header/trigger/reasoning panels, keeping the instruction
    and Enhance button pinned to the bottom of the prompt area at all times.
+   It never shrinks below its own content, though — on short viewports the
+   column scrolls instead of the Enhance button overlapping the instruction.
    Advanced settings open as an overlay (.advanced-panel) over the editor +
    instruction area, so they never grow the column. */
 .chain-card > .chain-editor-group {
   flex-shrink: 1;
+  min-height: fit-content;
 }
 .chain-editor {
   min-height: 10rem;
+}
+
+/* Version pills in the chain nav: one per link, scrolling inside their own
+   strip on long chains so the nav row never widens the page. The padding
+   keeps the focus ring of the first/last pill from being clipped. */
+.chain-pills {
+  display: flex;
+  gap: 0.25rem;
+  max-width: 60%;
+  overflow-x: auto;
+  padding: 3px;
+  scrollbar-width: none;
 }
 
 /* Links behind the leading column are history: faded and inert */

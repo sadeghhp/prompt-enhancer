@@ -2,11 +2,24 @@ export type Theme = 'light' | 'dark'
 
 const KEY = 'pe.theme'
 
-/** Saved preference, falling back to the OS color scheme. */
+/**
+ * Saved preference, falling back to the OS color scheme. Every access is
+ * guarded: reading `localStorage` throws outright when site data is blocked,
+ * and this runs inside the Alpine data factory — an exception here would
+ * leave the whole page unrendered.
+ */
 export function loadTheme(): Theme {
-  const saved = localStorage.getItem(KEY)
-  if (saved === 'light' || saved === 'dark') return saved
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  try {
+    const saved = localStorage.getItem(KEY)
+    if (saved === 'light' || saved === 'dark') return saved
+  } catch {
+    /* storage blocked — fall through to the OS preference */
+  }
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  } catch {
+    return 'light'
+  }
 }
 
 export function applyTheme(theme: Theme): void {
@@ -14,5 +27,9 @@ export function applyTheme(theme: Theme): void {
 }
 
 export function saveTheme(theme: Theme): void {
-  localStorage.setItem(KEY, theme)
+  try {
+    localStorage.setItem(KEY, theme)
+  } catch {
+    /* storage blocked — the toggle still applies for this page view */
+  }
 }

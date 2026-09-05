@@ -30,6 +30,31 @@ interface ModelPicker {
 /** Rows rendered per page in the picker, so huge lists stay responsive */
 const PICKER_PAGE = 200
 
+/**
+ * Newest fetch per provider. A second "Fetch models" (or Retry) while one is
+ * in flight must win, and the older response must not overwrite its panel.
+ */
+const pickerRequests = new Map<string, number>()
+let pickerRequestSeq = 0
+
+/**
+ * Memo for the picker's filtered list, keyed by provider. The template reads
+ * the filtered list several times per render (count, rows, "show more"), and
+ * a provider can expose several thousand model ids, so recomputing per read
+ * made typing in the filter box stutter. Kept outside the reactive data so
+ * reading it never writes reactive state during a render.
+ */
+const filterCache = new Map<string, { key: string; ids: string[] }>()
+
+function filterModels(available: string[], filter: string): string[] {
+  const terms = filter.toLowerCase().split(/\s+/).filter(Boolean)
+  if (terms.length === 0) return available
+  return available.filter((id) => {
+    const lower = id.toLowerCase()
+    return terms.every((t) => lower.includes(t))
+  })
+}
+
 Alpine.data('settingsApp', () => ({
   providers: [] as Provider[],
   bestPractices: [] as BestPracticeCollection[],
@@ -123,8 +148,24 @@ Alpine.data('settingsApp', () => ({
     this.persist()
   },
 
+  /**
+   * Removing a provider also discards its API key and model list, and there
+   * is no undo, so it asks first — the button sits one row from "Test".
+   */
   removeProvider(id: string) {
+    const provider = this.providers.find((p) => p.id === id)
+    if (!provider) return
+    const models = provider.models.length
+    const detail = models > 0 ? ` and its ${models} model${models === 1 ? '' : 's'}` : ''
+    if (
+      !confirm(
+        `Remove “${provider.name || 'this provider'}”${detail}? Its API key will be deleted from this browser. This cannot be undone.`,
+      )
+    )
+      return
     this.providers = this.providers.filter((p) => p.id !== id)
+    filterCache.delete(id)
+    pickerRequests.delete(id)
     this.persist()
   },
 
@@ -145,6 +186,9 @@ Alpine.data('settingsApp', () => ({
   },
 
   async openModelPicker(provider: Provider) {
+    const token = ++pickerRequestSeq
+    pickerRequests.set(provider.id, token)
+    filterCache.delete(provider.id)
     this.pickers[provider.id] = {
       status: 'loading',
       message: 'Fetching models…',
@@ -154,6 +198,8 @@ Alpine.data('settingsApp', () => ({
       limit: PICKER_PAGE,
     }
     const result = await fetchProviderModels(provider)
+    // A newer fetch for this provider started while this one was in flight.
+    if (pickerRequests.get(provider.id) !== token) return
     const picker = this.pickers[provider.id]
     if (!picker) return // panel was closed while the request was in flight
     if (!result.ok) {
@@ -173,20 +219,31 @@ Alpine.data('settingsApp', () => ({
   },
 
   closeModelPicker(providerId: string) {
+    pickerRequests.delete(providerId)
+    filterCache.delete(providerId)
     delete this.pickers[providerId]
   },
 
-  filteredPickerModels(picker: ModelPicker): string[] {
-    const terms = picker.filter.toLowerCase().split(/\s+/).filter(Boolean)
-    if (terms.length === 0) return picker.available
-    return picker.available.filter((id) => {
-      const lower = id.toLowerCase()
-      return terms.every((t) => lower.includes(t))
-    })
+  /**
+   * Model ids matching the picker's filter. Reading `filter` and `available`
+   * keeps this reactive; the result itself is memoized per provider so the
+   * several reads each render cost one pass, not several.
+   */
+  filteredPickerModels(providerId: string): string[] {
+    const picker = this.pickers[providerId]
+    if (!picker) return []
+    const key = `${picker.available.length} ${picker.filter}`
+    const cached = filterCache.get(providerId)
+    if (cached && cached.key === key) return cached.ids
+    const ids = filterModels(picker.available, picker.filter)
+    filterCache.set(providerId, { key, ids })
+    return ids
   },
 
-  visiblePickerModels(picker: ModelPicker): string[] {
-    return this.filteredPickerModels(picker).slice(0, picker.limit)
+  visiblePickerModels(providerId: string): string[] {
+    const picker = this.pickers[providerId]
+    if (!picker) return []
+    return this.filteredPickerModels(providerId).slice(0, picker.limit)
   },
 
   pickerSelectedCount(picker: ModelPicker): number {
@@ -194,8 +251,10 @@ Alpine.data('settingsApp', () => ({
   },
 
   /** Select every model matching the current filter (not just visible rows). */
-  selectAllFiltered(picker: ModelPicker) {
-    for (const id of this.filteredPickerModels(picker)) picker.selected[id] = true
+  selectAllFiltered(providerId: string) {
+    const picker = this.pickers[providerId]
+    if (!picker) return
+    for (const id of this.filteredPickerModels(providerId)) picker.selected[id] = true
   },
 
   clearPickerSelection(picker: ModelPicker) {

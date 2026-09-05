@@ -142,10 +142,11 @@ export interface PromptColumn {
   reasoning: string
   /** Seconds the model spent reasoning; 0 when it exposed no reasoning */
   reasoningSeconds: number
-  /** UI state: whether this column's advanced settings panel is expanded */
-  showAdvanced: boolean
-  /** UI state: whether this column's reasoning section is expanded */
-  showReasoning: boolean
+  /* Whether this column's advanced-settings and reasoning panels are open is
+     view state, not data: it lives in `openAdvanced` / `openReasoning` in
+     main.ts, so toggling a panel costs no write and no panel reopens itself
+     after a reload. Older records carried `showAdvanced` / `showReasoning`
+     fields; migration deletes them. */
 }
 
 export interface Session {
@@ -163,6 +164,8 @@ export interface Session {
   pinned?: boolean
   /** Hidden from the main list, tucked into the collapsible Archived section */
   archived?: boolean
+  /** Title was set by hand, so it no longer follows the prompt's first line */
+  customTitle?: boolean
   /* Legacy fields from the pre-chain data model; migrated on load */
   draft?: string
   instruction?: string
@@ -218,4 +221,21 @@ export const REASONING_TRUNCATED_MARKER = '\n\n… [reasoning truncated to save 
 export function capReasoning(text: string): string {
   if (text.length <= MAX_REASONING_CHARS) return text
   return text.slice(0, MAX_REASONING_CHARS) + REASONING_TRUNCATED_MARKER
+}
+
+/** Longest session title kept, in characters (not UTF-16 code units). */
+export const MAX_TITLE_CHARS = 42
+
+/**
+ * Session title derived from the first line of its original prompt. Counts
+ * code points rather than UTF-16 units, so trimming can never cut an emoji
+ * or other astral character in half and leave a replacement glyph.
+ */
+export function titleFromPrompt(text: string, fallback = 'New session'): string {
+  const firstLine = text.split('\n', 1)[0].trim()
+  if (!firstLine) return fallback
+  const chars = Array.from(firstLine)
+  return chars.length > MAX_TITLE_CHARS
+    ? `${chars.slice(0, MAX_TITLE_CHARS).join('')}…`
+    : firstLine
 }

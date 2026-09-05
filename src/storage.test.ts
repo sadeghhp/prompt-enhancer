@@ -62,6 +62,17 @@ describe('storage', () => {
     expect(() => storage.backupSessionsOnce()).not.toThrow()
   })
 
+  it('round-trips pane widths and sanitizes stored garbage', () => {
+    const ls = fakeStorage()
+    vi.stubGlobal('localStorage', ls)
+    const empty = { sidebar: null, preview: null, previewCollapsed: false }
+    expect(storage.loadLayout()).toEqual(empty)
+    expect(storage.saveLayout({ sidebar: 300, preview: null, previewCollapsed: true })).toBe(true)
+    expect(storage.loadLayout()).toEqual({ sidebar: 300, preview: null, previewCollapsed: true })
+    ls.data.set('pe.layout', '{"sidebar":"wide","preview":-1}')
+    expect(storage.loadLayout()).toEqual(empty)
+  })
+
   it('falls back on corrupt JSON instead of throwing', () => {
     const ls = fakeStorage()
     ls.data.set('pe.sessions', '{not json')
@@ -85,5 +96,78 @@ describe('storage', () => {
     vi.stubGlobal('localStorage', ls)
     storage.backupSessionsOnce()
     expect(ls.data.has('pe.sessions.backup')).toBe(false)
+  })
+
+  it('skips the backup when the blob is large enough to eat the quota', () => {
+    const ls = fakeStorage()
+    // Over the 512 KB budget: duplicating this would cost more quota than it
+    // could ever protect, so only the decision is recorded.
+    ls.data.set('pe.sessions', `["${'x'.repeat(600 * 1024)}"]`)
+    vi.stubGlobal('localStorage', ls)
+    storage.backupSessionsOnce()
+    expect(ls.data.has('pe.sessions.backup')).toBe(false)
+    expect(JSON.parse(ls.data.get('pe.sessions.backup.meta')!).kept).toBe(false)
+    // And it never retries on a later boot.
+    ls.data.set('pe.sessions', '[]')
+    storage.backupSessionsOnce()
+    expect(ls.data.has('pe.sessions.backup')).toBe(false)
+  })
+
+  it('reclaims the backup once it is older than a week, and never retakes it', () => {
+    const ls = fakeStorage()
+    ls.data.set('pe.sessions', '[{"id":"old"}]')
+    vi.stubGlobal('localStorage', ls)
+    storage.backupSessionsOnce()
+    expect(ls.data.has('pe.sessions.backup')).toBe(true)
+
+    const meta = JSON.parse(ls.data.get('pe.sessions.backup.meta')!)
+    meta.at = Date.now() - 8 * 24 * 60 * 60 * 1000
+    ls.data.set('pe.sessions.backup.meta', JSON.stringify(meta))
+    storage.backupSessionsOnce()
+    expect(ls.data.has('pe.sessions.backup')).toBe(false)
+
+    storage.backupSessionsOnce()
+    expect(ls.data.has('pe.sessions.backup')).toBe(false)
+  })
+
+  it('reports unreadable sessions instead of silently returning none', () => {
+    const ls = fakeStorage()
+    vi.stubGlobal('localStorage', ls)
+    expect(storage.readSessions()).toEqual({ sessions: [], corrupt: false, raw: null })
+
+    ls.data.set('pe.sessions', '{not json')
+    expect(storage.readSessions()).toMatchObject({ sessions: [], corrupt: true })
+
+    // Valid JSON that is not an array is just as unusable.
+    ls.data.set('pe.sessions', '{"nope":1}')
+    expect(storage.readSessions()).toMatchObject({ sessions: [], corrupt: true })
+
+    ls.data.set('pe.sessions', '[{"id":"a"}]')
+    expect(storage.readSessions()).toMatchObject({ corrupt: false })
+  })
+
+  it('records deletions, dedupes them and prunes expired ones', () => {
+    const ls = fakeStorage()
+    vi.stubGlobal('localStorage', ls)
+    storage.addDeleted('a')
+    storage.addDeleted('b')
+    storage.addDeleted('a')
+    expect(storage.loadDeleted().map((t) => t.id)).toEqual(['b', 'a'])
+
+    const stale = [{ id: 'ancient', at: Date.now() - 40 * 24 * 60 * 60 * 1000 }]
+    ls.data.set('pe.deleted', JSON.stringify(stale))
+    expect(storage.loadDeleted()).toEqual([])
+
+    ls.data.set('pe.deleted', '{"not":"an array"}')
+    expect(storage.loadDeleted()).toEqual([])
+  })
+
+  it('parks unreadable data under the quarantine key', () => {
+    const ls = fakeStorage()
+    vi.stubGlobal('localStorage', ls)
+    expect(storage.quarantine('unreadable', '{broken')).toBe(true)
+    const parked = JSON.parse(ls.data.get('pe.sessions.quarantine')!)
+    expect(parked.reason).toBe('unreadable')
+    expect(parked.data).toBe('{broken')
   })
 })

@@ -90,6 +90,29 @@ describe('enhancePrompt (SSE)', () => {
     ])
   })
 
+  it('joins a payload split across several data lines of one event', async () => {
+    // Per the SSE spec the data lines of an event are joined with newlines
+    // before parsing; handling each line on its own would drop this frame.
+    const frames = 'data: {"choices":[{"delta":\ndata: {"content":"split"}}]}\n\ndata: [DONE]\n\n'
+    vi.stubGlobal('fetch', vi.fn(async () => sseResponse([frames])))
+    expect(await enhancePrompt(provider, 'test-model', 'hi', context)).toBe('split')
+  })
+
+  it('ignores comment keep-alives and non-data fields', async () => {
+    const frames =
+      ': ping\n\nevent: message\nid: 7\ndata: ' +
+      JSON.stringify(contentDelta('kept')) +
+      '\n\n: another ping\n\n'
+    vi.stubGlobal('fetch', vi.fn(async () => sseResponse([frames])))
+    expect(await enhancePrompt(provider, 'test-model', 'hi', context)).toBe('kept')
+  })
+
+  it('handles CRLF line endings and a final event with no blank line', async () => {
+    const frames = `data: ${JSON.stringify(contentDelta('crlf'))}\r\n\r\ndata: ${JSON.stringify(contentDelta(' end'))}`
+    vi.stubGlobal('fetch', vi.fn(async () => sseResponse([frames])))
+    expect(await enhancePrompt(provider, 'test-model', 'hi', context)).toBe('crlf end')
+  })
+
   it('separates reasoning from content and trims the result', async () => {
     const frames = sse(reasoningDelta('think ')) + sse(contentDelta('  answer  '))
     const kinds: DeltaKind[] = []

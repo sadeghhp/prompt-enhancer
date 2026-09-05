@@ -6,11 +6,15 @@
     <title>Settings — Prompt Enhancer</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>" />
     <script>
-      // Apply the saved theme before first paint to avoid a flash
-      const saved = localStorage.getItem('pe.theme')
-      if (saved === 'dark' || (!saved && matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark')
-      }
+      // Apply the saved theme before first paint to avoid a flash. Reading
+      // localStorage throws outright when site data is blocked, so this is
+      // guarded — an exception here would stop the module scripts below.
+      try {
+        const saved = localStorage.getItem('pe.theme')
+        if (saved === 'dark' || (!saved && matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark')
+        }
+      } catch {}
     </script>
     <link rel="stylesheet" href="/src/style.css" />
     <script type="module" src="/src/settings-page.ts"></script>
@@ -156,18 +160,18 @@
                           class="field field-xs w-64"
                         />
                         <button
-                          @click="selectAllFiltered(pickers[provider.id])"
+                          @click="selectAllFiltered(provider.id)"
                           title="Select every model matching the current filter"
                           class="btn btn-outline btn-xs"
                         >Select all</button>
                         <button @click="clearPickerSelection(pickers[provider.id])" class="btn btn-outline btn-xs">Clear selection</button>
                         <span
                           class="ml-auto text-xs text-(--text-muted) tabular-nums"
-                          x-text="`${pickerSelectedCount(pickers[provider.id])} selected · ${filteredPickerModels(pickers[provider.id]).length} of ${pickers[provider.id].available.length} match`"
+                          x-text="`${pickerSelectedCount(pickers[provider.id])} selected · ${filteredPickerModels(provider.id).length} of ${pickers[provider.id].available.length} match`"
                         ></span>
                       </div>
                       <ul class="mt-2 max-h-64 overflow-y-auto rounded-(--radius-sm) border border-(--border-default) bg-(--surface-field)">
-                        <template x-for="m in visiblePickerModels(pickers[provider.id])" :key="m">
+                        <template x-for="m in visiblePickerModels(provider.id)" :key="m">
                           <li>
                             <label class="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-xs text-(--text-secondary) transition hover:bg-(--surface-hover)">
                               <input type="checkbox" x-model="pickers[provider.id].selected[m]" class="checkbox size-3.5" />
@@ -176,15 +180,15 @@
                           </li>
                         </template>
                         <li
-                          x-show="filteredPickerModels(pickers[provider.id]).length === 0"
+                          x-show="filteredPickerModels(provider.id).length === 0"
                           class="px-3 py-2 text-xs text-(--text-muted)"
                         >No models match this filter.</li>
                       </ul>
                       <button
-                        x-show="filteredPickerModels(pickers[provider.id]).length > pickers[provider.id].limit"
+                        x-show="filteredPickerModels(provider.id).length > pickers[provider.id].limit"
                         @click="pickers[provider.id].limit += 200"
                         class="mt-1.5 w-full rounded-(--radius-sm) border border-dashed border-(--border-strong) py-1 text-xs text-(--text-muted) transition hover:bg-(--surface-hover)"
-                        x-text="`Show more (${filteredPickerModels(pickers[provider.id]).length - pickers[provider.id].limit} hidden)`"
+                        x-text="`Show more (${filteredPickerModels(provider.id).length - pickers[provider.id].limit} hidden)`"
                       ></button>
                       <div class="mt-2 flex items-center justify-end gap-2">
                         <button @click="closeModelPicker(provider.id)" class="btn btn-ghost btn-xs">Cancel</button>

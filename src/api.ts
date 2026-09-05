@@ -16,8 +16,14 @@ function authHeaders(provider: Provider): Record<string, string> {
   return headers
 }
 
-/** Verify the provider endpoint and key by listing its models. */
-export async function testProvider(provider: Provider): Promise<TestResult> {
+/**
+ * Single call to the provider's `/models` endpoint, shared by the connection
+ * test and the model picker: both need the same request, the same error
+ * wording, and the same id extraction.
+ */
+async function listModels(
+  provider: Provider,
+): Promise<{ ok: true; ids: string[] } | { ok: false; message: string }> {
   try {
     const res = await fetch(`${normalizeBaseUrl(provider.baseUrl)}/models`, {
       headers: authHeaders(provider),
@@ -26,11 +32,26 @@ export async function testProvider(provider: Provider): Promise<TestResult> {
       return { ok: false, message: `HTTP ${res.status}: ${await safeError(res)}` }
     }
     const data = await res.json()
-    const count = Array.isArray(data?.data) ? data.data.length : 0
-    return { ok: true, message: `Connected — ${count} models available` }
+    const raw: unknown[] = Array.isArray(data?.data) ? data.data : []
+    const ids = [
+      ...new Set(
+        raw
+          .map((m) => (m as { id?: unknown })?.id)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0),
+      ),
+    ].sort((a, b) => a.localeCompare(b))
+    return { ok: true, ids }
   } catch (err) {
     return { ok: false, message: describeNetworkError(err) }
   }
+}
+
+/** Verify the provider endpoint and key by listing its models. */
+export async function testProvider(provider: Provider): Promise<TestResult> {
+  const result = await listModels(provider)
+  return result.ok
+    ? { ok: true, message: `Connected — ${result.ids.length} models available` }
+    : { ok: false, message: result.message }
 }
 
 export interface FetchModelsResult {
@@ -42,29 +63,12 @@ export interface FetchModelsResult {
 
 /** List the model IDs the provider exposes via its /models endpoint. */
 export async function fetchProviderModels(provider: Provider): Promise<FetchModelsResult> {
-  try {
-    const res = await fetch(`${normalizeBaseUrl(provider.baseUrl)}/models`, {
-      headers: authHeaders(provider),
-    })
-    if (!res.ok) {
-      return { ok: false, message: `HTTP ${res.status}: ${await safeError(res)}`, models: [] }
-    }
-    const data = await res.json()
-    const raw: unknown[] = Array.isArray(data?.data) ? data.data : []
-    const ids = [
-      ...new Set(
-        raw
-          .map((m) => (m as { id?: unknown })?.id)
-          .filter((id): id is string => typeof id === 'string' && id.length > 0),
-      ),
-    ].sort((a, b) => a.localeCompare(b))
-    if (ids.length === 0) {
-      return { ok: false, message: 'The provider returned no models.', models: [] }
-    }
-    return { ok: true, message: `${ids.length} models available`, models: ids }
-  } catch (err) {
-    return { ok: false, message: describeNetworkError(err), models: [] }
+  const result = await listModels(provider)
+  if (!result.ok) return { ok: false, message: result.message, models: [] }
+  if (result.ids.length === 0) {
+    return { ok: false, message: 'The provider returned no models.', models: [] }
   }
+  return { ok: true, message: `${result.ids.length} models available`, models: result.ids }
 }
 
 /** Verify a specific model responds by requesting a minimal completion. */
@@ -326,7 +330,12 @@ export async function enhancePrompt(
     })
     disarm()
     if (!res.ok) {
-      throw new Error(`Provider error (HTTP ${res.status}): ${await safeError(res)}`)
+      // Reading the error body is another read from the same stalled server,
+      // so it gets a deadline of its own rather than hanging indefinitely.
+      arm(IDLE_TIMEOUT_MS)
+      const detail = await safeError(res)
+      disarm()
+      throw new Error(`Provider error (HTTP ${res.status}): ${detail}`)
     }
     let text: string
     if (res.headers.get('content-type')?.includes('text/event-stream')) {
@@ -389,9 +398,16 @@ async function readSseStream(
   let buffer = ''
   let fullText = ''
 
-  const handleLine = (line: string) => {
-    if (!line.startsWith('data:')) return
-    const payload = line.slice(5).trim()
+  // Data lines of the event being assembled. An SSE event ends at a blank
+  // line, and its `data:` lines are joined with newlines — a provider may
+  // split one JSON payload across several of them, so a line cannot be
+  // parsed on its own.
+  let eventData: string[] = []
+
+  const dispatch = () => {
+    if (eventData.length === 0) return
+    const payload = eventData.join('\n').trim()
+    eventData = []
     if (!payload || payload === '[DONE]') return
     let event: any
     try {
@@ -415,6 +431,17 @@ async function readSseStream(
     }
   }
 
+  const handleLine = (rawLine: string) => {
+    const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+    if (line === '') return dispatch() // blank line terminates the event
+    if (line.startsWith(':')) return // comment, typically a keep-alive
+    const colon = line.indexOf(':')
+    const field = colon === -1 ? line : line.slice(0, colon)
+    if (field !== 'data') return // id / event / retry carry nothing we use
+    const value = colon === -1 ? '' : line.slice(colon + 1)
+    eventData.push(value.startsWith(' ') ? value.slice(1) : value)
+  }
+
   try {
     onChunk?.()
     while (true) {
@@ -424,10 +451,12 @@ async function readSseStream(
       buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split('\n')
       buffer = lines.pop() ?? ''
-      for (const line of lines) handleLine(line.trim())
+      for (const line of lines) handleLine(line)
     }
     buffer += decoder.decode()
-    if (buffer.trim()) handleLine(buffer.trim())
+    if (buffer) handleLine(buffer)
+    // A last event that the server never terminated with a blank line.
+    dispatch()
     return fullText
   } catch (err) {
     await reader.cancel().catch(() => {})

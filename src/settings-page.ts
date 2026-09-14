@@ -70,6 +70,9 @@ Alpine.data('settingsApp', () => ({
   theme: loadTheme(),
   /** Set when a write to localStorage fails; shown as a persistent banner */
   storageError: '',
+  /** Brief "Saved" acknowledgement — the page has no Save button to press */
+  saved: false,
+  _savedTimer: 0 as ReturnType<typeof setTimeout> | 0,
 
   toggleTheme() {
     this.theme = this.theme === 'dark' ? 'light' : 'dark'
@@ -86,6 +89,12 @@ Alpine.data('settingsApp', () => ({
   /** Record the outcome of a write so a full/blocked storage is never silent. */
   noteSave(ok: boolean) {
     this.storageError = ok ? '' : STORAGE_ERROR_MESSAGE
+    if (!ok) return
+    this.saved = true
+    clearTimeout(this._savedTimer)
+    this._savedTimer = setTimeout(() => {
+      this.saved = false
+    }, 1800)
   },
 
   persist() {

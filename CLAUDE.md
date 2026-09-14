@@ -41,6 +41,11 @@ on `<html>` (see `@custom-variant dark` in style.css), not the OS setting.
 | `--text-secondary` | Body text, labels-in-context |
 | `--text-muted` | Secondary metadata, field labels |
 | `--text-faint` | Placeholders, hints, "(optional)" |
+
+Each text step clears 4.5:1 against every surface it is used on — including
+the accent-tinted active session row and the page ground, not just the card.
+Keep it that way when adjusting the scale: these are 12–14px roles, and
+`--text-faint` carries real instructions in the editor placeholder.
 | `--accent`, `--accent-hover` | Primary actions, version badge (indigo) |
 | `--accent-soft`, `--accent-soft-hover` | Tinted fills (active nav, soft buttons, selected session) |
 | `--accent-text` | Accent-colored text on soft fills |
@@ -117,6 +122,10 @@ rounded block showing a small `v` prefix (`.version-prefix`) and a large bold
 number = the column's 1-based position in the chain. Rules:
 
 - The badge is the visual anchor of the column header — keep it first, left.
+  It is also a `<button>`: clicking it shows that column in the Markdown
+  preview (`aria-pressed` tracks the current one), so choosing what the
+  preview shows is reachable from the keyboard and not only by clicking
+  somewhere in the column. Its `title` carries the column's timestamp.
 - `min-width` + padding + `tabular-nums` make 1-, 2-, and 3-digit versions
   render at identical style; never truncate it.
 - Lineage is stated next to the badge: column 0 reads "Original prompt /
@@ -130,7 +139,15 @@ number = the column's 1-based position in the chain. Rules:
   preview header ("v{n} · {words}").
 - Every editor header and the preview header carry a length readout from
   `describeLength` (`src/text.ts`): words · chars, plus the word-count
-  change against the previous link for enhanced columns.
+  change against the previous link for enhanced columns. The change is
+  withheld while a column is being streamed into — comparing a part-written
+  response against a finished one just races through nonsense figures. In
+  that header the title never wraps and the readout absorbs the shrinking;
+  a wrapped "Enhanced prompt" drops the column's text a line and breaks the
+  baseline it shares with the column beside it.
+- The column header's timestamp is `hidden @xl:inline` — a container query,
+  not a viewport one. At ordinary column widths the lineage wins the space;
+  the badge's tooltip still carries the date.
 
 ### Responsive layout
 
@@ -138,9 +155,14 @@ number = the column's 1-based position in the chain. Rules:
   horizontally. All horizontal motion happens inside the chain viewport
   (`overflow-clip`, `min-w-0`) via transform, so the header never shifts.
 - App frame grid lives in `.app-layout` (style.css): below `md` everything
-  stacks (the sidebar caps at `max-h-48` and scrolls); from `md` the sidebar
+  stacks (the sidebar caps at `max-h-64` and scrolls); from `md` the sidebar
   gets its own track and the Markdown preview is a full-width strip under
   the chain; from `xl` the preview is the third track.
+- Below `md` the frame grows and the *page* scrolls vertically: `html`,
+  `body` and `.app-frame` drop to `height: auto`, and the chain row gets
+  `minmax(30rem, auto)`. Holding all three panes inside one viewport left
+  the chain — the only pane the user works in — with less height than either
+  the sidebar or the preview. Horizontal containment is unaffected.
 - Sidebar and preview widths are resizable: `--sidebar-width` /
   `--preview-width` default to CSS `clamp()`s and are overridden inline from
   `layout` state in `main.ts` (`layoutStyle`). Each pane carries a
@@ -155,13 +177,23 @@ number = the column's 1-based position in the chain. Rules:
   — change the CSS and the JS together. The preview can also be hidden
   (`layout.previewCollapsed`, "Hide" in its header / "Show preview" in the
   chain nav): `.app-layout-no-preview` gives the chain the track back.
+- Each column is `.chain-column` (the `@container`) holding two children: the
+  scrolling `.chain-card`, and `.chain-actions` — the Enhance row — **outside**
+  it. Keep it that way. When Enhance lived inside the card it scrolled out of
+  sight entirely at 1024×768, and a sticky row instead put it in a z-index
+  fight with the advanced-settings overlay that the overlay won. Outside the
+  scroller it needs no sticky positioning, and the overlay (bounded by the
+  card) can never reach it.
 - `.chain-editor-group` has `min-height: fit-content`, so on short
-  viewports the column scrolls instead of the Enhance button overlapping
-  the instruction card.
+  viewports the card scrolls instead of collapsing the editor.
 - Chain: `.chain-track` slides horizontally by `--view-index` (set inline by
   Alpine) × `--chain-step`. Default `--chain-step: 50%` (two columns: a
   version and its enhancement side by side); from `1800px` it is `33.333%`
   (three columns); below `lg` it is `94%` (one column + a peek of the next).
+  A chain with fewer links than the viewport shows overrides the step on
+  `.chain-track` itself so the columns fill the width instead of editing in
+  half a window — use `:nth-of-type`, since `x-for` leaves its `<template>`
+  as the track's first child and `:nth-child` would miscount by one.
   Widths live in CSS only, but `visibleColumnCount()` in `main.ts` mirrors
   the same two breakpoints via `matchMedia` to clamp `viewIndex` — change
   the CSS and the JS together. `interactiveColumnCount()` adds the narrow
@@ -179,14 +211,25 @@ number = the column's 1-based position in the chain. Rules:
   unmounting costs nothing but scroll position.
 - `.chain-card` scrolls vertically at every width (`overflow-y: auto`,
   children `flex-shrink: 0`, editor min-height via `.chain-editor`) so no
-  control is ever clipped and the page itself needs no vertical scrolling.
-- Each `.chain-card` is an `@container`: per-column form grids use container
-  variants (`grid-cols-2 @lg:grid-cols-3`) so density tracks the column's
-  own width, not the viewport. Advanced settings use `.field-xs` fields.
+  control is ever clipped and, from `md` up, the page itself needs no
+  vertical scrolling.
+- Each `.chain-column` is an `@container` (it wraps the card, so its width is
+  the column's): per-column form grids use container variants
+  (`grid-cols-2 @lg:grid-cols-3`) so density tracks the column's own width,
+  not the viewport. Advanced settings use `.field-xs` fields.
 - Advanced settings open as an in-column overlay (`.advanced-panel`,
-  `--surface-pop` + `--shadow-pop`) over the editor + instruction area —
-  never in-flow, so opening them displaces nothing; the Enhance button
-  stays visible below the panel and the panel body scrolls internally.
+  `--surface-pop` + `--shadow-pop`) over the editor, reasoning and
+  instruction area — never in-flow, so opening them displaces nothing; the
+  Enhance button stays visible below the panel and the panel body scrolls
+  internally, with its scrollbar track drawn (the global transparent track
+  made a clipped settings list look like the end of the panel).
+  `toggleAdvanced(col, $el)` focuses the panel on open and returns focus to
+  the trigger on close, so Escape is scoped to the panel rather than bound
+  to the window from every mounted column.
+- The reasoning strip sits **below** the editor, not above it: only enhanced
+  columns ever have one, and above the editor it pushed that column's text
+  down and broke the side-by-side alignment the two-column comparison
+  depends on.
 - The per-column Enhance button is `min-w-1/3`, right-aligned in its column
   — a fixed third truncated its "Enhance → v12" label in a narrow column.
 - Nothing may overflow the viewport horizontally except the chain track
@@ -196,6 +239,14 @@ number = the column's 1-based position in the chain. Rules:
 
 - Keep business logic out of templates beyond Alpine bindings; state lives in
   `src/main.ts` / `src/settings-page.ts`.
+- **Every `<select>` whose options come from an `x-for` needs**
+  `x-effect="$nextTick(() => { $el.value = <the bound value> })"`. Alpine
+  applies `x-model` before the options exist, so without it the control
+  silently falls back to its first option and displays a value the user never
+  chose. This bit both selects on the Settings page.
+- A control that acts on one column (Copy, the version badge, Enhance) uses
+  `@click.stop`: the chain slot's own click handler would otherwise also
+  re-select that column for the preview as a side effect.
 - `persist()` after every user-visible state change. It is debounced
   (250 ms trailing, flushed on `pagehide`, window blur and tab hide) because
   serializing every session per keystroke was the main source of typing lag;
@@ -212,7 +263,23 @@ number = the column's 1-based position in the chain. Rules:
   is always cancellable (`cancelEnhance()`) and times out on its own
   (connect and idle deadlines in `api.ts`), and a failed or cancelled run
   restores the chain — including the links it had replaced — exactly as it
-  was. Streamed chunks are buffered and applied once per animation frame.
+  was. Streamed chunks are buffered and applied once per animation frame,
+  and the target column's textarea is `readonly` for the duration: every
+  frame assigns the whole accumulated response, so anything typed into it
+  mid-stream was silently overwritten.
+- A *successful* enhancement that replaced later links keeps them in
+  `undoReplace` and offers "Undo" in the notice strip (`restoreReplaced()`)
+  for as long as that notice is up. Clear it whenever the offer stops making
+  sense — another run, or switching session.
+- `schedulePreview` renders the preview on a 150 ms trailing debounce **with
+  a `PREVIEW_MAX_WAIT_MS` cap**. Without the cap a stream starves it outright:
+  chunks land once per animation frame, so the timer was cleared and re-armed
+  ~10× per delay and never fired until the response ended. Any future
+  debounce over streamed text needs the same max-wait.
+- `previewColumn` falls back to the **last column in view**, not the last in
+  the chain, so the pane never shows something the user cannot see beside it.
+  `enhanceFrom` relies on this: it clears `previewId` and slides the new link
+  into the last visible slot, which makes the preview follow the stream.
 - Stored data is never trusted. `migrateColumn`/`migrateSession` check every
   field and repair what they can; a record too damaged to use makes
   `migrateSession` throw, and `migrateAll` sets just that record aside so one

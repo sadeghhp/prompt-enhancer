@@ -23,11 +23,21 @@
     <div x-data="settingsApp" x-cloak class="flex min-h-full flex-col">
       <!-- Header -->
       <header class="flex items-center justify-between border-b border-(--border-default) bg-(--surface-header) px-4 py-3 backdrop-blur sm:px-6">
-        <a href="./" class="flex items-center gap-2.5">
-          <span class="grid size-8 place-items-center rounded-(--radius-sm) bg-(--accent-soft) text-lg">✨</span>
-          <span class="text-base font-semibold tracking-tight text-(--text-primary)">Prompt Enhancer</span>
+        <a href="./" class="flex min-w-0 items-center gap-2.5">
+          <span class="grid size-8 shrink-0 place-items-center rounded-(--radius-sm) bg-(--accent-soft) text-lg">✨</span>
+          <!-- Truncates rather than wrapping; see index.html. -->
+          <span class="truncate text-base font-semibold tracking-tight text-(--text-primary)">Prompt Enhancer</span>
         </a>
-        <nav class="flex items-center gap-1 text-sm">
+        <nav class="flex shrink-0 items-center gap-1 text-sm">
+          <!-- There is no Save button — every field writes on change. Say so,
+               rather than leaving users hunting for one. -->
+          <span
+            x-show="saved"
+            x-cloak
+            x-transition.opacity
+            role="status"
+            class="mr-2 text-xs font-medium text-(--success)"
+          >Saved</span>
           <a href="./" class="btn btn-ghost">Enhance</a>
           <a href="./settings.html" class="btn btn-soft">Settings</a>
           <button
@@ -53,7 +63,8 @@
           <div>
             <h1 class="text-lg font-semibold text-(--text-primary)">LLM providers</h1>
             <p class="mt-0.5 text-sm text-(--text-muted)">
-              Add any OpenAI-compatible provider. Keys are stored only in your browser.
+              Add any OpenAI-compatible provider. Keys are stored only in your browser,
+              and every change on this page saves as you make it.
             </p>
           </div>
           <button @click="addProvider()" class="btn btn-primary">+ Add provider</button>
@@ -276,7 +287,15 @@
             </label>
             <label class="block">
               <span class="field-label">Output format</span>
-              <select x-model="defaults.outputFormat" @change="persistDefaults()" class="field">
+              <!-- x-effect + $nextTick: Alpine applies x-model before x-for has
+                   produced the options, so without this the select silently
+                   falls back to its first option and shows the wrong value. -->
+              <select
+                x-model="defaults.outputFormat"
+                x-effect="$nextTick(() => { $el.value = defaults.outputFormat })"
+                @change="persistDefaults()"
+                class="field"
+              >
                 <template x-for="f in outputFormats" :key="f.value">
                   <option :value="f.value" x-text="f.label"></option>
                 </template>
@@ -372,7 +391,13 @@
                         <input type="checkbox" x-model="item.enabled" @change="persistPractices()" class="checkbox" />
                         Enabled
                       </label>
-                      <select x-model="item.kind" @change="persistPractices()" class="field field-xs w-auto">
+                      <!-- Same option-ordering guard as Output format above. -->
+                      <select
+                        x-model="item.kind"
+                        x-effect="$nextTick(() => { $el.value = item.kind })"
+                        @change="persistPractices()"
+                        class="field field-xs w-auto"
+                      >
                         <template x-for="k in practiceKinds" :key="k.value">
                           <option :value="k.value" x-text="k.label"></option>
                         </template>

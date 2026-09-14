@@ -267,6 +267,13 @@ interface EnhanceRun {
 const PERSIST_DEBOUNCE_MS = 250
 /** Delay before the Markdown preview re-renders while its text is changing. */
 const PREVIEW_DEBOUNCE_MS = 150
+/**
+ * Longest the preview may lag behind the text it shows. A plain trailing
+ * debounce is starved by a stream: chunks are applied once per animation frame,
+ * so the timer was cleared and re-armed roughly ten times per delay and never
+ * fired until the response ended. This caps the wait so the pane keeps up.
+ */
+const PREVIEW_MAX_WAIT_MS = 400
 
 // Non-reactive bookkeeping. Kept out of the Alpine component on purpose:
 // writes to these must not trigger effects, and the preview effect below
@@ -275,10 +282,18 @@ let activeController: AbortController | null = null
 let persistTimer: ReturnType<typeof setTimeout> | undefined
 let previewTimer: ReturnType<typeof setTimeout> | undefined
 let previewKey = ''
+/** When the preview last actually parsed, for the max-wait cap above. */
+let previewRenderedAt = 0
 /** Whether anything is waiting to be written; cleared by a successful flush. */
 let dirty = false
 /** Session whose `updatedAt` is bumped on the next persist flush. */
 let touchedSession: Session | null = null
+/**
+ * Trigger button of each open advanced panel, so focus can return to it on
+ * close. Kept outside the component: it holds DOM nodes, which must never be
+ * made reactive or persisted.
+ */
+const advancedTriggers = new Map<string, HTMLElement>()
 
 const dateFormatter = new Intl.DateTimeFormat(undefined, {
   month: 'short',
@@ -305,6 +320,12 @@ Alpine.data('mainApp', () => ({
   /** Transient confirmation (e.g. import summary); clears itself */
   notice: '',
   _noticeTimer: 0 as ReturnType<typeof setTimeout> | 0,
+  /**
+   * Links that the last successful enhancement replaced, restorable while the
+   * notice is up. Enhancing an earlier column deletes every later link, and a
+   * browser `confirm()` is thin cover for losing a long refinement chain.
+   */
+  undoReplace: null as { sessionId: string; index: number; links: PromptColumn[] } | null,
   /** The in-flight enhancement, or null when idle. One at a time, app-wide. */
   enhancing: null as EnhanceRun | null,
   /** Column id currently in the reasoning phase; empty when none */
@@ -544,6 +565,28 @@ Alpine.data('mainApp', () => ({
     return i >= from && i < from + this.visibleColumns
   },
 
+  /**
+   * Keep the leading visible column's pill inside the nav strip. The strip
+   * scrolls on long chains and hides its scrollbar, so without this the current
+   * position simply disappears off the left. Scrolls only the strip — never
+   * `scrollIntoView`, which would also move ancestors.
+   */
+  scrollPillIntoView(index: number) {
+    this.$nextTick(() => {
+      const strip = this.$refs.pills as HTMLElement | undefined
+      // Query the buttons, not `children`: x-for leaves its own <template> as
+      // the strip's first element child, which would shift every index by one.
+      const pill = strip?.querySelectorAll('button')[index]
+      if (!strip || !pill) return
+      const left = pill.offsetLeft - strip.offsetLeft
+      const right = left + pill.offsetWidth
+      if (left < strip.scrollLeft) strip.scrollLeft = left - 4
+      else if (right > strip.scrollLeft + strip.clientWidth) {
+        strip.scrollLeft = right - strip.clientWidth + 4
+      }
+    })
+  },
+
   /** Slide so column `i` is in view and show it in the preview (version pills). */
   goToView(i: number) {
     const session = this.session
@@ -554,9 +597,15 @@ Alpine.data('mainApp', () => ({
     this.persist()
   },
 
-  /** "142 words · 812 chars", with the change against the previous link. */
+  /**
+   * "142 words · 812 chars", with the change against the previous link. The
+   * comparison is withheld while this column is being streamed into: measuring
+   * a quarter-written response against a finished one reports "−92% words" and
+   * races upward for the whole stream.
+   */
   lengthSummary(col: PromptColumn, i: number): string {
-    const previous = i > 0 ? this.session.chain[i - 1]?.text : undefined
+    const streaming = this.enhancing?.targetId === col.id
+    const previous = !streaming && i > 0 ? this.session.chain[i - 1]?.text : undefined
     return describeLength(col.text, previous)
   },
 
@@ -570,12 +619,30 @@ Alpine.data('mainApp', () => ({
     return `${n.toLocaleString()} word${n === 1 ? '' : 's'}`
   },
 
-  showNotice(text: string) {
+  showNotice(text: string, ms = 5000) {
     this.notice = text
     clearTimeout(this._noticeTimer)
     this._noticeTimer = setTimeout(() => {
       this.notice = ''
-    }, 5000)
+      this.undoReplace = null
+    }, ms)
+  },
+
+  /**
+   * Put back the links the last enhancement replaced, dropping the link it
+   * produced. Offered from the notice strip for as long as that notice is up.
+   */
+  restoreReplaced() {
+    const undo = this.undoReplace
+    this.undoReplace = null
+    this.notice = ''
+    if (!undo) return
+    const session = this.sessions.find((s) => s.id === undo.sessionId)
+    if (!session) return
+    session.chain.splice(undo.index + 1, session.chain.length, ...undo.links)
+    session.viewIndex = clampView(undo.index, session.chain.length, this.visibleColumns)
+    this.previewId = ''
+    this.persistNow()
   },
 
   /** Highest allowed viewIndex: the last `visibleColumns` links fill the viewport. */
@@ -610,13 +677,19 @@ Alpine.data('mainApp', () => ({
   },
 
   /**
-   * Column shown in the Markdown preview pane. Falls back to the rightmost
-   * (most recent) link when nothing is selected or the selected column no
-   * longer exists — e.g. after re-enhancing replaced later links.
+   * Column shown in the Markdown preview pane. With nothing selected — or when
+   * the selection is gone, e.g. after re-enhancing replaced later links — it
+   * follows the last column in view rather than the last column in the chain,
+   * so the pane always shows something the user can actually see beside it.
+   * During an enhancement that is the link being streamed into, because
+   * `enhanceFrom` slides the new link into the last visible slot.
    */
   get previewColumn(): PromptColumn {
     const chain = this.session.chain
-    return chain.find((c) => c.id === this.previewId) ?? chain[chain.length - 1]
+    const picked = chain.find((c) => c.id === this.previewId)
+    if (picked) return picked
+    const last = this.session.viewIndex + this.visibleColumns - 1
+    return chain[Math.max(0, Math.min(last, chain.length - 1))]
   },
 
   /** 1-based version number of the previewed column, for the pane header. */
@@ -627,17 +700,22 @@ Alpine.data('mainApp', () => ({
   /**
    * Render immediately when the previewed column changes or empties (cheap,
    * and the user expects the pane to follow a click at once); otherwise wait
-   * for a pause in the edits/stream before parsing the whole text again.
+   * for a pause in the edits/stream before parsing the whole text again —
+   * but never longer than `PREVIEW_MAX_WAIT_MS`, so text that keeps arriving
+   * (a stream, or continuous typing) can't starve the debounce indefinitely.
    */
   schedulePreview(id: string, text: string) {
     clearTimeout(previewTimer)
     const render = () => {
       previewTimer = undefined
       previewKey = id
+      previewRenderedAt = Date.now()
       this.previewHtml = text.trim() ? renderMarkdown(text) : ''
     }
-    if (id !== previewKey || !text.trim()) render()
-    else previewTimer = setTimeout(render, PREVIEW_DEBOUNCE_MS)
+    if (id !== previewKey || !text.trim()) return render()
+    const waited = Date.now() - previewRenderedAt
+    if (waited >= PREVIEW_MAX_WAIT_MS) return render()
+    previewTimer = setTimeout(render, Math.min(PREVIEW_DEBOUNCE_MS, PREVIEW_MAX_WAIT_MS - waited))
   },
 
   selectPreview(col: PromptColumn) {
@@ -842,9 +920,26 @@ Alpine.data('mainApp', () => ({
   },
 
   canEnhance(col: PromptColumn): boolean {
-    return Boolean(
-      !this.enhancing && this.providerFor(col) && col.settings.modelId && col.text.trim(),
-    )
+    return !this.enhanceBlocker(col)
+  },
+
+  /**
+   * Why this column can't be enhanced right now, or '' when it can. The button
+   * is disabled for four different reasons and used to explain none of them —
+   * its title offered a keyboard shortcut that would not have worked either.
+   */
+  enhanceBlocker(col: PromptColumn): string {
+    if (this.enhancing) {
+      return this.enhancing.sourceId === col.id ? 'Enhancing…' : 'Another enhancement is running.'
+    }
+    if (!this.providerFor(col)) {
+      return this.providers.length === 0
+        ? 'Add a provider in Settings first.'
+        : 'Choose a provider in Advanced settings.'
+    }
+    if (!col.settings.modelId) return 'Choose a model in Advanced settings.'
+    if (!col.text.trim()) return 'Write a prompt first.'
+    return ''
   },
 
   /**
@@ -872,6 +967,9 @@ Alpine.data('mainApp', () => ({
     this.activeId = id
     this.error = ''
     this.previewId = ''
+    // The undo offer belongs to the view the user is leaving.
+    this.undoReplace = null
+    this.notice = ''
     // The session may have been saved at a different viewport width.
     const session = this.session
     session.viewIndex = clampView(session.viewIndex, session.chain.length, this.visibleColumns)
@@ -1005,12 +1103,27 @@ Alpine.data('mainApp', () => ({
     this.persistNow()
   },
 
-  toggleAdvanced(col: PromptColumn) {
-    this.openAdvanced[col.id] = !this.advancedOpen(col)
+  /**
+   * Open or close a column's advanced settings. The panel covers the editor, so
+   * focus moves into it on open and back to the trigger on close — otherwise
+   * keyboard users had to tab through the controls it is drawn on top of.
+   */
+  toggleAdvanced(col: PromptColumn, trigger?: HTMLElement) {
+    if (this.advancedOpen(col)) return this.closeAdvanced(col)
+    this.openAdvanced[col.id] = true
+    if (trigger) advancedTriggers.set(col.id, trigger)
+    this.$nextTick(() => {
+      const panel = trigger?.closest('.chain-card')?.querySelector('.advanced-panel')
+      if (panel instanceof HTMLElement) panel.focus()
+    })
   },
 
   closeAdvanced(col: PromptColumn) {
+    if (!this.advancedOpen(col)) return
     this.openAdvanced[col.id] = false
+    const trigger = advancedTriggers.get(col.id)
+    advancedTriggers.delete(col.id)
+    if (trigger?.isConnected) trigger.focus()
   },
 
   /** Collapsed-state summary shown on the Advanced settings trigger. */
@@ -1100,6 +1213,8 @@ Alpine.data('mainApp', () => ({
     const previousPreviewId = this.previewId
 
     this.error = ''
+    // Any earlier undo is about links this run is superseding.
+    this.undoReplace = null
     session.chain.splice(index + 1)
     // Create the next link up front and stream tokens into it so the
     // response appears in real time.
@@ -1208,6 +1323,14 @@ Alpine.data('mainApp', () => ({
       target.text = enhanced
       target.reasoning = capReasoning(target.reasoning)
       this.touch(session)
+      // Enhancing an earlier column destroyed the links after it. Keep them
+      // reachable for a moment rather than leaving the confirm() as the only
+      // thing standing between a mis-aimed click and a lost chain.
+      if (removed.length > 0) {
+        this.undoReplace = { sessionId: session.id, index, links: removed }
+        const n = removed.length
+        this.showNotice(`Replaced ${n} later ${n === 1 ? 'link' : 'links'}.`, 12000)
+      }
     } catch (err) {
       // Drop the placeholder and put the previously removed links back, so
       // a failed or cancelled request leaves the chain exactly as it was.

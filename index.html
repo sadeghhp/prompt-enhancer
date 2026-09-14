@@ -20,14 +20,16 @@
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body class="h-full bg-(--surface-page) text-(--text-secondary) antialiased">
-    <div x-data="mainApp" x-cloak class="flex h-full flex-col">
+    <div x-data="mainApp" x-cloak class="app-frame flex h-full flex-col">
       <!-- Header -->
       <header class="flex items-center justify-between border-b border-(--border-default) bg-(--surface-header) px-4 py-3 backdrop-blur sm:px-6">
-        <a href="./" class="flex items-center gap-2.5">
-          <span class="grid size-8 place-items-center rounded-(--radius-sm) bg-(--accent-soft) text-lg">✨</span>
-          <span class="text-base font-semibold tracking-tight text-(--text-primary)">Prompt Enhancer</span>
+        <a href="./" class="flex min-w-0 items-center gap-2.5">
+          <span class="grid size-8 shrink-0 place-items-center rounded-(--radius-sm) bg-(--accent-soft) text-lg">✨</span>
+          <!-- Truncates rather than wrapping: a two-line wordmark doubled the
+               header's height on a phone, where vertical space is scarcest. -->
+          <span class="truncate text-base font-semibold tracking-tight text-(--text-primary)">Prompt Enhancer</span>
         </a>
-        <nav class="flex items-center gap-1 text-sm">
+        <nav class="flex shrink-0 items-center gap-1 text-sm">
           <a href="./" class="btn btn-soft">Enhance</a>
           <a href="./settings.html" class="btn btn-ghost">Settings</a>
           <button
@@ -67,7 +69,11 @@
            each of those panes carries a drag handle in the gap beside it. -->
       <main x-ref="layout" :style="layoutStyle" :class="layout.previewCollapsed ? 'app-layout-no-preview' : ''" class="app-layout min-h-0 flex-1 gap-4 p-4">
         <!-- Left: sessions -->
-        <aside x-ref="sidebarPane" class="card relative flex min-h-0 max-h-48 flex-col md:max-h-none">
+        <!-- The stacked cap is generous enough to show whole session rows: at
+             max-h-48 the list got ~60px between the search box and the
+             Export/Import footer and sliced a row in half. The page scrolls
+             below md, so the extra height costs the chain nothing. -->
+        <aside x-ref="sidebarPane" class="card relative flex max-h-64 min-h-0 flex-col md:max-h-none">
           <div
             role="separator"
             aria-orientation="vertical"
@@ -97,7 +103,19 @@
             />
           </div>
           <ul class="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
-            <li x-show="visibleSessions.length === 0 && sessionQuery" x-cloak class="px-3 py-2 text-xs text-(--text-faint)">No sessions match.</li>
+            <!-- `matchesQuery` also runs over archived sessions, so a bare
+                 "No sessions match" contradicted the Archived section below it.
+                 x-if, not x-show: counting archived matches means filtering and
+                 sorting every session, and that must not run on each render
+                 when there is no query — session switches are on this path. -->
+            <template x-if="visibleSessions.length === 0 && sessionQuery">
+              <li
+                class="px-3 py-2 text-xs text-(--text-faint)"
+                x-text="archivedSessions.length
+                  ? `No active sessions match — ${archivedSessions.length} in Archived below.`
+                  : 'No sessions match.'"
+              ></li>
+            </template>
             <template x-for="s in visibleSessions" :key="s.id">
               <li>
                 <div
@@ -118,7 +136,7 @@
                     />
                   </template>
                   <template x-if="renamingId !== s.id">
-                    <button @click="openSession(s.id)" @dblclick="startRename(s)" title="Double-click to rename" class="flex min-w-0 flex-1 items-start gap-1.5 text-left">
+                    <button @click="openSession(s.id)" @dblclick="startRename(s)" :aria-current="s.id === activeId ? 'true' : null" title="Double-click to rename" class="flex min-w-0 flex-1 items-start gap-1.5 text-left">
                       <span class="min-w-0">
                         <span class="block truncate text-sm" :class="s.id === activeId ? 'font-medium text-(--text-primary)' : 'text-(--text-secondary)'" x-text="s.title"></span>
                         <span class="mt-0.5 block truncate text-xs whitespace-nowrap text-(--text-muted)">
@@ -282,22 +300,43 @@
                   :inert="isOutOfView(i)"
                 >
                 <template x-if="isMounted(i)">
-                <div class="chain-card @container flex h-full flex-col gap-2.5 px-1.5">
+                <!-- The column is a scrolling card plus a fixed action row.
+                     Enhance lives OUTSIDE the scroller so it is always on
+                     screen whatever the column height — no sticky positioning,
+                     and nothing for the advanced-settings overlay to collide
+                     with. The container query lives here, on the element whose
+                     width is the column's. -->
+                <div class="chain-column @container flex h-full flex-col gap-2.5 px-1.5">
+                <div class="chain-card flex min-h-0 flex-1 flex-col gap-2.5">
                   <!-- Column header: version badge + lineage + actions.
                        The accent ring marks the column shown in the preview. -->
                   <div class="card flex items-center gap-2.5 px-3 py-2" :class="previewColumn.id === col.id ? 'ring-1 ring-(--accent-ring)' : ''">
-                    <span class="version-badge shrink-0" :title="`Version ${i + 1} in the enhancement chain`">
+                    <!-- The badge doubles as this column's preview selector:
+                         a real button, so choosing what the preview shows is
+                         reachable from the keyboard, not only by clicking the
+                         column. It also carries the timestamp, which no longer
+                         competes with the lineage for header width. -->
+                    <button
+                      type="button"
+                      @click.stop="selectPreview(col)"
+                      :aria-pressed="previewColumn.id === col.id"
+                      :title="`Show v${i + 1} in the Markdown preview · created ${formatDate(col.createdAt)}`"
+                      class="version-badge shrink-0"
+                    >
                       <span class="version-prefix">v</span><span x-text="i + 1"></span>
-                    </span>
+                    </button>
                     <span class="min-w-0 flex-1">
                       <span class="block truncate text-sm font-semibold text-(--text-primary)">
                         <span x-show="i === 0">Original prompt</span>
                         <span x-show="i > 0" x-cloak>Enhanced from <span class="font-semibold text-(--accent-text) tabular-nums" x-text="`v${i}`"></span></span>
                       </span>
-                      <span class="block truncate text-xs text-(--text-muted)" x-text="col.producedBy ? `by ${col.producedBy}` : 'written by you'"></span>
+                      <span class="block truncate text-xs text-(--text-muted)" x-text="col.producedBy ? `by ${col.producedBy}` : (i === 0 ? 'written by you' : 'provider not recorded')"></span>
                     </span>
                     <span class="flex shrink-0 items-center gap-2 text-xs text-(--text-muted)">
-                      <span class="hidden sm:inline" x-text="formatDate(col.createdAt)"></span>
+                      <!-- Only wide columns can spare room for the timestamp;
+                           below that the lineage above wins, and the badge's
+                           tooltip still carries the date. -->
+                      <span class="hidden @xl:inline" x-text="formatDate(col.createdAt)"></span>
                       <!-- Cancel lives on the column being streamed into: on
                            narrow screens the source column has already slid
                            into the past (inert) by the time this is needed. -->
@@ -308,7 +347,7 @@
                         class="btn btn-danger-ghost btn-xs"
                       >Cancel</button>
                       <button
-                        @click="copyColumn(col)"
+                        @click.stop="copyColumn(col)"
                         :aria-label="copiedId === col.id ? 'Prompt copied to clipboard' : `Copy ${i === 0 ? 'original prompt' : 'enhanced prompt'} to clipboard`"
                         class="btn btn-outline btn-xs"
                         :class="copiedId === col.id ? 'text-(--success)' : ''"
@@ -323,7 +362,7 @@
                        never displaces the editor, instruction, or Enhance. -->
                   <div class="card" :class="advancedOpen(col) ? 'ring-1 ring-(--accent-ring)' : ''">
                     <button
-                      @click="toggleAdvanced(col)"
+                      @click="toggleAdvanced(col, $el)"
                       :aria-expanded="advancedOpen(col)"
                       class="flex w-full items-center gap-2 px-3 py-2"
                     >
@@ -343,57 +382,72 @@
                     </button>
                   </div>
 
-                  <!-- Reasoning: chain-of-thought captured while producing this link.
-                       One strip morphs from live "Thinking…" into a collapsed,
-                       expandable "Thought for Ns" summary — collapsed by default. -->
-                  <div x-show="col.reasoning || thinkingId === col.id" x-cloak class="card-inset">
-                    <button
-                      type="button"
-                      @click="toggleReasoning(col)"
-                      :aria-expanded="reasoningOpen(col)"
-                      class="thinking-header"
-                    >
-                      <span class="thinking-dot" :class="thinkingId === col.id ? 'is-pulsing' : ''" aria-hidden="true"></span>
-                      <span
-                        class="font-medium text-(--text-secondary)"
-                        x-text="thinkingId === col.id
-                          ? `Thinking… ${thinkingSeconds}s`
-                          : (col.reasoningSeconds ? `Thought for ${col.reasoningSeconds}s` : 'Reasoning')"
-                      ></span>
-                      <span class="ml-auto text-(--text-muted)" x-text="reasoningOpen(col) ? '▲' : '▼'"></span>
-                    </button>
-                    <div x-show="reasoningOpen(col)" role="region" aria-label="Model reasoning">
-                      <pre
-                        class="thinking-text"
-                        x-text="col.reasoning || 'Waiting for the model\'s reasoning…'"
-                        x-effect="if (thinkingId === col.id && col.reasoning) $el.scrollTop = $el.scrollHeight"
-                      ></pre>
-                    </div>
-                  </div>
-
                   <!-- Prompt editor + instruction + Enhance form one pinned
-                       group: it grows to fill the space left by the header,
-                       trigger, and reasoning panels above, so the instruction
-                       and Enhance button always sit at the bottom of the prompt
-                       area. The inner wrapper is the positioning context for
-                       the Advanced settings overlay: the panel floats over the
-                       editor + instruction only, leaving Enhance visible. -->
+                       group: it grows to fill the space left by the header and
+                       trigger above, so the instruction and Enhance button
+                       always sit at the bottom of the prompt area. The inner
+                       wrapper is the positioning context for the Advanced
+                       settings overlay: the panel floats over the editor,
+                       reasoning and instruction, leaving Enhance visible. -->
                   <div class="chain-editor-group flex flex-1 flex-col gap-2.5">
                     <div class="relative flex min-h-0 flex-1 flex-col gap-2.5">
                       <!-- Editable prompt text -->
                       <div class="chain-editor card flex min-h-0 flex-1 flex-col">
                         <div class="flex items-baseline justify-between gap-2 border-b border-(--border-default) px-3 py-2">
-                          <span class="text-sm font-semibold text-(--text-primary)" x-text="i === 0 ? 'Your prompt' : 'Enhanced prompt'"></span>
-                          <span class="truncate text-xs text-(--text-muted) tabular-nums" :title="i > 0 ? `Word change is relative to v${i}` : ''" x-text="lengthSummary(col, i)"></span>
+                          <!-- The title never wraps and the readout absorbs the
+                               shrinking: a wrapped "Enhanced prompt" pushed this
+                               column's text down a line and broke the baseline
+                               it shares with the column beside it. -->
+                          <span class="shrink-0 text-sm font-semibold whitespace-nowrap text-(--text-primary)" x-text="i === 0 ? 'Your prompt' : 'Enhanced prompt'"></span>
+                          <span class="min-w-0 truncate text-xs text-(--text-muted) tabular-nums" :title="i > 0 ? `Word change is relative to v${i}` : ''" x-text="lengthSummary(col, i)"></span>
                         </div>
+                        <!-- Read-only while the model is streaming into it:
+                             every frame assigns the whole accumulated response,
+                             so anything typed here mid-stream was overwritten
+                             without warning. Still focusable, so text can be
+                             selected and copied as it arrives. -->
                         <textarea
                           x-model="col.text"
+                          :readonly="enhancing?.targetId === col.id"
                           @input="touch()"
                           @keydown.ctrl.enter.prevent="enhanceShortcut(i)"
                           @keydown.meta.enter.prevent="enhanceShortcut(i)"
                           :placeholder="i === 0 ? 'Write or paste the prompt you want to enhance — any language works.' : 'The enhanced prompt appears here — edit it freely before the next enhancement.'"
                           class="min-h-0 flex-1 resize-none bg-transparent p-3 text-sm leading-relaxed text-(--text-primary) placeholder:text-(--text-faint) focus:outline-none"
                         ></textarea>
+                      </div>
+
+                      <!-- Reasoning: chain-of-thought captured while producing
+                           this link. One strip morphs from live "Thinking…"
+                           into a collapsed, expandable "Thought for Ns"
+                           summary — collapsed by default. It sits below the
+                           editor rather than above it because only enhanced
+                           columns ever have one: above, it pushed this column's
+                           editor down and broke the side-by-side alignment that
+                           the whole two-column comparison depends on. -->
+                      <div x-show="col.reasoning || thinkingId === col.id" x-cloak class="card-inset shrink-0">
+                        <button
+                          type="button"
+                          @click="toggleReasoning(col)"
+                          :aria-expanded="reasoningOpen(col)"
+                          class="thinking-header"
+                        >
+                          <span class="thinking-dot" :class="thinkingId === col.id ? 'is-pulsing' : ''" aria-hidden="true"></span>
+                          <span
+                            class="font-medium text-(--text-secondary)"
+                            x-text="thinkingId === col.id
+                              ? `Thinking… ${thinkingSeconds}s`
+                              : (col.reasoningSeconds ? `Thought for ${col.reasoningSeconds}s` : 'Reasoning')"
+                          ></span>
+                          <span class="ml-auto text-(--text-muted)" x-text="reasoningOpen(col) ? '▲' : '▼'"></span>
+                        </button>
+                        <div x-show="reasoningOpen(col)" role="region" aria-label="Model reasoning">
+                          <pre
+                            class="thinking-text"
+                            x-text="col.reasoning || 'Waiting for the model\'s reasoning…'"
+                            x-effect="if (thinkingId === col.id && col.reasoning) $el.scrollTop = $el.scrollHeight"
+                          ></pre>
+                        </div>
                       </div>
 
                       <!-- Enhancement instruction (independent per column) -->
@@ -414,11 +468,15 @@
                       </div>
                       <!-- Advanced settings overlay: floats over the editor
                            + instruction area, so opening it never displaces
-                           them or the Enhance button below -->
+                           them or the Enhance button below. `toggleAdvanced`
+                           focuses it on open and returns focus to the trigger
+                           on close, so Escape is scoped to the panel rather
+                           than bound to the window from every mounted column. -->
                       <div
                         x-show="advancedOpen(col)"
                         x-cloak
-                        @keydown.escape.window="advancedOpen(col) && closeAdvanced(col)"
+                        tabindex="-1"
+                        @keydown.escape.stop="closeAdvanced(col)"
                         x-transition:enter="transition duration-200 ease-out motion-reduce:transition-none"
                         x-transition:enter-start="translate-y-2 opacity-0"
                         x-transition:enter-end="translate-y-0 opacity-100"
@@ -435,7 +493,10 @@
                               Advanced settings
                               <span class="font-normal text-(--text-muted)">for <span class="font-semibold text-(--accent-text) tabular-nums" x-text="`v${i + 2}`"></span></span>
                             </span>
-                            <span class="block truncate text-xs text-(--text-muted)" x-text="`These control the next enhancement, not v${i + 1} itself.`"></span>
+                            <!-- Wraps rather than truncates: cut to one line in
+                                 a normal-width column, this read "…not v" and
+                                 lost the distinction it exists to make. -->
+                            <span class="block text-xs text-(--text-muted)" x-text="`These control the next enhancement, not v${i + 1} itself.`"></span>
                           </span>
                           <button @click="closeAdvanced(col)" class="btn btn-soft btn-xs shrink-0">Done</button>
                         </div>
@@ -606,15 +667,20 @@
                       </div>
                     </div>
 
-                    <!-- Enhance: generates the next link in the chain -->
-                    <div class="flex shrink-0 justify-end">
+                  </div>
+                </div>
+
+                    <!-- Enhance: generates the next link in the chain. Outside
+                         `.chain-card`, so it cannot scroll out of sight the way
+                         it did at 1024×768 and below. -->
+                    <div class="chain-actions shrink-0">
                       <!-- .stop: the column's own click handler would otherwise
                            re-select this column for the preview, undoing
                            enhanceFrom's switch to the newest link. -->
                       <button
                         @click.stop="enhanceFrom(i)"
                         :disabled="!canEnhance(col)"
-                        :title="enhancing && enhancing.sourceId !== col.id ? 'Another enhancement is running' : 'Ctrl+Enter or ⌘+Enter from the editor'"
+                        :title="enhanceBlocker(col) || 'Ctrl+Enter or ⌘+Enter from the editor'"
                         class="btn btn-primary min-w-1/3 rounded-(--radius-md) px-3 py-2.5"
                       >
                         <span x-show="enhancing?.sourceId !== col.id" class="truncate" x-text="`✨ Enhance → v${i + 2}`"></span>
@@ -624,7 +690,6 @@
                         </span>
                       </button>
                     </div>
-                  </div>
                 </div>
                 </template>
                 </div>
@@ -632,8 +697,33 @@
             </div>
           </div>
 
-          <p x-show="error" x-cloak class="mt-3 rounded-(--radius-md) bg-(--danger-soft) px-4 py-2.5 text-sm text-(--danger)" x-text="error"></p>
-          <p x-show="notice" x-cloak role="status" class="mt-3 rounded-(--radius-md) bg-(--accent-soft) px-4 py-2.5 text-sm text-(--accent-text)" x-text="notice"></p>
+          <!-- Enhancement failures: role="alert" so they are announced, matching
+               the storage banner, and dismissible so a stale one doesn't sit
+               under the chain until the next run. -->
+          <div
+            x-show="error"
+            x-cloak
+            role="alert"
+            class="mt-3 flex items-start gap-3 rounded-(--radius-md) bg-(--danger-soft) px-4 py-2.5 text-sm text-(--danger)"
+          >
+            <span class="min-w-0 flex-1" x-text="error"></span>
+            <button @click="error = ''" class="btn btn-danger-ghost btn-xs shrink-0">Dismiss</button>
+          </div>
+          <div
+            x-show="notice"
+            x-cloak
+            role="status"
+            class="mt-3 flex items-start gap-3 rounded-(--radius-md) bg-(--accent-soft) px-4 py-2.5 text-sm text-(--accent-text)"
+          >
+            <span class="min-w-0 flex-1" x-text="notice"></span>
+            <!-- Enhancing an earlier column deletes every later link; they stay
+                 restorable for as long as this notice is up. -->
+            <button
+              x-show="undoReplace"
+              @click="restoreReplaced()"
+              class="btn btn-soft btn-xs shrink-0"
+            >Undo</button>
+          </div>
 
           <!-- Chain navigation: arrows plus one pill per version. Pills for
                the columns in view are highlighted; clicking one slides to
@@ -648,7 +738,16 @@
                 title="Earlier links in the chain (←)"
                 class="btn btn-outline px-4 py-1.5"
               >←</button>
-              <div class="chain-pills" role="group" aria-label="Versions in the chain">
+              <!-- x-effect keeps the leading column's pill in view: the strip
+                   scrolls on long chains and hides its scrollbar, so the
+                   current position otherwise vanished off the left edge. -->
+              <div
+                class="chain-pills"
+                role="group"
+                aria-label="Versions in the chain"
+                x-ref="pills"
+                x-effect="scrollPillIntoView(session.viewIndex)"
+              >
                 <template x-for="(col, i) in session.chain" :key="col.id">
                   <button
                     @click="goToView(i)"

@@ -203,11 +203,11 @@ try {
   {
     const { ctx, page, errors } = await open(browser, { active: 'four' })
     const before = await storedChain(page, 'four')
-    await page.locator('.chain-card').nth(1).locator('button.btn-primary').click({ force: true })
-    await page.waitForSelector('p[x-show="error"]', { state: 'visible' })
+    await page.locator('.chain-column').nth(1).locator('button.btn-primary').click({ force: true })
+    await page.waitForSelector('[role="alert"][x-show="error"]', { state: 'visible' })
     await page.waitForTimeout(400)
     check('a failed enhancement restores every later link', JSON.stringify(await storedChain(page, 'four')) === JSON.stringify(before), `${before.length} links`)
-    check('the provider error is shown', (await page.$eval('p[x-show="error"]', (el) => el.textContent)).includes('mock failure'))
+    check('the provider error is shown', (await page.$eval('[role="alert"][x-show="error"]', (el) => el.textContent)).includes('mock failure'))
     check('no page errors on the failure path', errors.length === 0, errors.join(' | ').slice(0, 200))
     await ctx.close()
   }
@@ -216,18 +216,38 @@ try {
   {
     const { ctx, page, errors } = await open(browser, { active: 'cancel' })
     const before = await storedChain(page, 'cancel')
-    await page.locator('.chain-card').nth(1).locator('button.btn-primary').click({ force: true })
+    await page.locator('.chain-column').nth(1).locator('button.btn-primary').click({ force: true })
     const cancel = page.locator('.chain-card button:has-text("Cancel"):visible')
     await cancel.waitFor({ state: 'visible' })
     check('exactly one Enhance button shows the spinner', (await page.locator('.animate-spin:visible').count()) === 1)
+
+    // The preview must keep up with the stream. A plain trailing debounce is
+    // starved by per-frame chunks and renders nothing until the response ends.
+    const previewSizes = []
+    for (let i = 0; i < 6; i += 1) {
+      await page.waitForTimeout(220)
+      previewSizes.push(await page.evaluate(() => document.querySelector('.markdown-body')?.textContent.length ?? 0))
+    }
+    check(
+      'the preview renders progressively while the response streams',
+      new Set(previewSizes).size > 2 && previewSizes.at(-1) > 0,
+      previewSizes.join(' → '),
+    )
+    check(
+      'the streaming column rejects edits',
+      await page.evaluate(() => {
+        const cards = [...document.querySelectorAll('.chain-card')]
+        return cards.some((c) => c.querySelector('textarea')?.readOnly === true)
+      }),
+    )
     await page.waitForTimeout(300)
     await cancel.click({ force: true })
     await page.waitForTimeout(400)
     check('cancel restores the chain', JSON.stringify(await storedChain(page, 'cancel')) === JSON.stringify(before))
-    check('cancel reports no error', !(await page.$eval('p[x-show="error"]', (el) => getComputedStyle(el).display !== 'none')))
-    check('Enhance is usable again after cancel', await page.locator('.chain-card').nth(1).locator('button.btn-primary').isEnabled())
+    check('cancel reports no error', !(await page.$eval('[role="alert"][x-show="error"]', (el) => getComputedStyle(el).display !== 'none')))
+    check('Enhance is usable again after cancel', await page.locator('.chain-column').nth(1).locator('button.btn-primary').isEnabled())
 
-    await page.locator('.chain-card').nth(1).locator('button.btn-primary').click({ force: true })
+    await page.locator('.chain-column').nth(1).locator('button.btn-primary').click({ force: true })
     await page.waitForFunction(
       () => {
         const s = JSON.parse(localStorage.getItem('pe.sessions')).find((x) => x.id === 'cancel')
@@ -250,6 +270,48 @@ try {
     check('the Enhance label is not truncated', label && !label.clipped, label?.text)
     check('no page errors on the cancel/success path', errors.length === 0, errors.join(' | ').slice(0, 200))
     await ctx.close()
+  }
+
+  /* ---- The primary action stays reachable however short the column gets ---- */
+  {
+    for (const viewport of [
+      { width: 1024, height: 768 },
+      { width: 820, height: 900 },
+      { width: 390, height: 780 },
+    ]) {
+      const { ctx, page } = await open(browser, { viewport, active: 'four' })
+      // Open the advanced overlay too: it is the one thing tall enough to
+      // cover the action row, and it did when that row was sticky inside
+      // the scrolling card.
+      await page.evaluate(() => {
+        const b = [...document.querySelectorAll('button')].find((x) => /Advanced settings/.test(x.textContent))
+        b.click()
+      })
+      await page.waitForTimeout(400)
+      const state = await page.evaluate(() => {
+        const column = document.querySelector('.chain-column')
+        const btn = [...column.querySelectorAll('button')].find((b) => /Enhance →/.test(b.textContent))
+        // Below md the page itself scrolls, so bring the button into the
+        // window before hit-testing; what matters is that nothing covers it.
+        btn.scrollIntoView({ block: 'center' })
+        const box = column.getBoundingClientRect()
+        const r = btn.getBoundingClientRect()
+        // Hit-test the button's own centre: on screen is not enough, it has
+        // to be the element the pointer would actually reach.
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+        return {
+          hidden: Math.round(Math.max(0, r.bottom - box.bottom)),
+          reachable: btn === hit || btn.contains(hit),
+          covering: btn === hit || btn.contains(hit) ? '' : (hit?.className || hit?.tagName || '?').toString().slice(0, 30),
+        }
+      })
+      check(
+        `Enhance stays visible and clickable at ${viewport.width}×${viewport.height}`,
+        state.hidden === 0 && state.reachable,
+        state.reachable ? `${state.hidden}px hidden` : `covered by ${state.covering}`,
+      )
+      await ctx.close()
+    }
   }
 
   /* ---- Two tabs share storage: merge instead of last-write-wins ---- */

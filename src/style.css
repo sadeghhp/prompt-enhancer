@@ -23,11 +23,12 @@
   --border-default: var(--color-slate-200);
   --border-strong: var(--color-slate-300);
 
-  /* Text */
+  /* Text — each step clears 4.5:1 against every surface it is used on,
+     including the accent-tinted session row and the page background. */
   --text-primary: var(--color-slate-900);
-  --text-secondary: var(--color-slate-600);
-  --text-muted: var(--color-slate-500);
-  --text-faint: var(--color-slate-400);
+  --text-secondary: var(--color-slate-700);
+  --text-muted: var(--color-slate-600);
+  --text-faint: var(--color-slate-500);
 
   /* Accent (indigo) */
   --accent: var(--color-indigo-600);
@@ -76,7 +77,9 @@
   --text-primary: var(--color-white);
   --text-secondary: var(--color-slate-300);
   --text-muted: var(--color-slate-400);
-  --text-faint: var(--color-slate-500);
+  /* Between slate-400 and -500: still clearly the faintest step, but placeholder
+     text on --surface-field stays above 4.5:1. */
+  --text-faint: color-mix(in oklab, var(--color-slate-400) 70%, var(--color-slate-500));
 
   --accent-text: var(--color-indigo-300);
   --accent-soft: color-mix(in oklab, var(--color-indigo-500) 15%, transparent);
@@ -291,6 +294,19 @@ body {
     font-weight: 600;
     opacity: 0.8;
   }
+  /* The badge doubles as the column's "show this version in the preview"
+     control, so it needs a cursor and a focus ring like any other button. */
+  button.version-badge {
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+  button.version-badge:hover {
+    background: var(--accent-hover);
+  }
+  button.version-badge:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-ring);
+  }
 
   /* Reasoning disclosure: one strip that morphs from a live "Thinking…"
      indicator (pulsing dot) into a collapsed "Thought for Ns" toggle. */
@@ -443,10 +459,23 @@ body {
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-pop);
   }
+  /* The panel takes focus on open (see `toggleAdvanced`), which otherwise
+     draws the UA's black `outline: auto` around the whole overlay. It is a
+     landing target, not a control: the accent ring on its trigger card and its
+     own border + shadow already say which layer is active. */
+  .advanced-panel:focus,
+  .advanced-panel:focus-visible {
+    outline: none;
+  }
   .advanced-panel-body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    /* The globally transparent scrollbar track leaves a clipped settings list
+       looking like the end of the panel. Here the track is drawn, so the fact
+       that there is more below is visible. */
+    scrollbar-color: var(--border-strong) var(--surface-inset);
+    overscroll-behavior: contain;
   }
 
   /* Long chains of thought scroll inside the strip instead of growing it */
@@ -497,6 +526,25 @@ body {
   --preview-width: clamp(20rem, 20vw, 26rem);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+}
+
+/* Below md the three panes stack. Holding them all inside one viewport left the
+   chain — the only pane the user works in — with less height than either of the
+   other two, so here the frame grows and the page scrolls vertically instead,
+   and the chain row is guaranteed enough room for a whole column. Horizontal
+   containment is unaffected: html/body stay `overflow-x: clip`. */
+@media (max-width: 767px) {
+  html,
+  body {
+    height: auto;
+  }
+  .app-frame {
+    height: auto;
+    min-height: 100%;
+  }
+  .app-layout {
+    grid-template-rows: auto minmax(30rem, auto) auto;
+  }
 }
 @media (min-width: 768px) {
   .app-layout {
@@ -607,8 +655,15 @@ body.is-resizing * {
   transition: opacity 0.45s ease, transform 0.45s ease;
 }
 
+/* Every column is a scrolling `.chain-card` plus a `.chain-actions` row that
+   stays out of the scroller, so Enhance is on screen at every height. */
+.chain-column {
+  width: 100%;
+  min-width: 0;
+}
+
 /* Column content can exceed the viewport height at any width: scroll inside
-   the column instead of the page, and keep the prompt editor comfortably
+   the card instead of the page, and keep the prompt editor comfortably
    tall. Future links stay fully visible/interactive — the viewport clips
    them; only links that slid into history fade out. */
 .chain-card {
@@ -619,19 +674,29 @@ body.is-resizing * {
 .chain-card > * {
   flex-shrink: 0;
 }
-/* The editor group is the one column child allowed to shrink: it soaks up the
-   space left by the header/trigger/reasoning panels, keeping the instruction
-   and Enhance button pinned to the bottom of the prompt area at all times.
-   It never shrinks below its own content, though — on short viewports the
-   column scrolls instead of the Enhance button overlapping the instruction.
-   Advanced settings open as an overlay (.advanced-panel) over the editor +
-   instruction area, so they never grow the column. */
+/* The editor group is the one card child allowed to shrink: it soaks up the
+   space left by the header and advanced trigger above it, keeping the
+   instruction field at the bottom of the prompt area at all times. It never
+   shrinks below its own content, though — on short viewports the card scrolls
+   rather than collapsing the editor. Advanced settings open as an overlay
+   (.advanced-panel) over the editor + reasoning + instruction area, so they
+   never grow the column, and they are bounded by the card — which is why the
+   action row below it can never be covered. */
 .chain-card > .chain-editor-group {
   flex-shrink: 1;
   min-height: fit-content;
 }
 .chain-editor {
-  min-height: 10rem;
+  min-height: 8rem;
+}
+
+/* The column's primary action sits OUTSIDE `.chain-card`, below the scroll
+   region, so it is on screen at every column height without sticky positioning
+   — and the advanced-settings overlay, which is bounded by the card, can never
+   reach it. It used to live inside the card and vanished at 1024×768. */
+.chain-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* Version pills in the chain nav: one per link, scrolling inside their own
@@ -644,6 +709,33 @@ body.is-resizing * {
   overflow-x: auto;
   padding: 3px;
   scrollbar-width: none;
+}
+
+/* The chain slide is a large-area translation — exactly the motion this
+   preference exists to suppress. Columns still change, just without the travel.
+   Must sit after the rules above: same specificity, so order decides. */
+@media (prefers-reduced-motion: reduce) {
+  .chain-track,
+  .chain-slot {
+    transition: none;
+  }
+}
+
+/* A chain with fewer links than the viewport shows spreads to fill it, rather
+   than editing in half a window with the rest of the track empty. Set on the
+   track so it overrides the breakpoint values inherited from :root below.
+   `nth-of-type`, not `nth-child`: x-for leaves its own <template> as the
+   track's first child, which would make the first slot look like the second. */
+.chain-track:not(:has(> .chain-slot:nth-of-type(2))) {
+  --chain-step: 100%;
+}
+@media (min-width: 1800px) {
+  /* Exactly two links at the three-column width: half each, no empty trailing
+     slot. A single link keeps the 100% above — hence the lower bound, since
+     this block would otherwise also match it and win on order. */
+  .chain-track:has(> .chain-slot:nth-of-type(2)):not(:has(> .chain-slot:nth-of-type(3))) {
+    --chain-step: 50%;
+  }
 }
 
 /* Links behind the leading column are history: faded and inert */
